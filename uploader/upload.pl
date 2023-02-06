@@ -23,7 +23,7 @@ $set{'admin_pass'} = '1234';		#管理者パスワード
 # $set{'base_cgi'} , $set{'http_html_path'} , $set{'http_src_path'} をフルパス(http://～～ or /～～)で記述する
 $set{'html_dir'} = './';		# 内部HTML保存ディレクトリ
 $set{'src_dir'} = './src/';		# 内部ファイル保存ディレクトリ
-$set{'base_cgi'} = './upload.cgi'; # このスクリプト名 http://～の指定可能
+$set{'base_cgi'} = './upload.pl'; # このスクリプト名 http://～の指定可能
 $set{'http_html_path'} = './';		# html参照 httpPATH http://～の指定可能
 $set{'http_src_path'} = './src/';		# file参照 httpPATH http://～の指定可能
 
