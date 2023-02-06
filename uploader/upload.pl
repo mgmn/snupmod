@@ -1,195 +1,260 @@
 #!/usr/bin/perl
-use CGI;
-use vars qw(%set %in);
+
+package snup;
+
 use strict;
-$set{'log_file'} = './log.cgi';		#ƒƒOƒtƒ@ƒCƒ‹–¼
-$set{'max_log'} = 30;		#•ÛŒ”
-$set{'max_size'} = 1*1024;		#Å‘å“Še—e—Ê(KB)
-$set{'min_flag'} = 0;		#Å¬—e—Ê§ŒÀ‚ğg—p‚·‚é=1
-$set{'min_size'} = 100;		#Å¬“Še—e—Ê(KB)
-$set{'max_all_flag'} = 0;		#‘—e—Ê§ŒÀ‚ğg—p‚·‚é=1
-$set{'max_all_size'} = 20*1024;		#‘§ŒÀ—e—Ê(KB)
-$set{'file_pre'} = 'up';		#ƒtƒ@ƒCƒ‹Ú“ª«
-$set{'pagelog'} = 10;		#1ƒy[ƒW‚É•\¦‚·‚éƒtƒ@ƒCƒ‹”
-$set{'base_html'} = 'upload.html';		#1ƒy[ƒW–Ú‚Ìƒtƒ@ƒCƒ‹–¼
-$set{'interval'} = 0;		#“¯ˆêIP“ŠeŠÔŠu•b”
-$set{'deny_host'} = '';		#“Še‹Ö~IP/HOST ,‚Å‹æØ‚é ex.(bbtec.net,219.119.66,ac.jp)
-$set{'admin_name'} = 'admin';		#ŠÇ—ÒƒƒOƒCƒ“ID
-$set{'admin_pass'} = '1234';		#ŠÇ—ÒƒpƒXƒ[ƒh
+use warnings;
+no warnings 'redefine';
+use CGI;
+use Encode;
+use Net::SMTP;
+use Net::POP3;
 
-# ˆÈ‰º5€–Ú‚ğÄİ’è‚·‚éÛ‚É‚ÍPATHCƒfƒBƒŒƒNƒgƒŠ‚Í / ‚ÅI‚í‚é‚±‚Æ
-# $set{'html_dir'},$set{'base_cgi'}‚ğ ./ ˆÈŠO‚Éİ’è‚·‚éê‡,
-# ‚Ü‚½‚ÍDLkey‚ğg—p‚µ ‚È‚¨‚©‚ÂHTMLƒLƒƒƒbƒVƒ…($set{'dummy_html'} = 2 or 3)‚ğg—p‚·‚éê‡‚Í
-# $set{'base_cgi'} , $set{'http_html_path'} , $set{'http_src_path'} ‚ğƒtƒ‹ƒpƒX(http://`` or /``)‚Å‹Lq‚·‚é
-$set{'html_dir'} = './';		# “à•”HTML•Û‘¶ƒfƒBƒŒƒNƒgƒŠ
-$set{'src_dir'} = './src/';		# “à•”ƒtƒ@ƒCƒ‹•Û‘¶ƒfƒBƒŒƒNƒgƒŠ
-$set{'base_cgi'} = './upload.pl'; # ‚±‚ÌƒXƒNƒŠƒvƒg–¼ http://`‚Ìw’è‰Â”\
-$set{'http_html_path'} = './';		# htmlQÆ httpPATH http://`‚Ìw’è‰Â”\
-$set{'http_src_path'} = './src/';		# fileQÆ httpPATH http://`‚Ìw’è‰Â”\
+# ã‚«ãƒ¬ãƒ³ãƒˆãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªã®å–å¾—ãƒ»å¤‰æ›´
+if(exists $ENV{MOD_PERL}){ my $chpath = $ENV{SCRIPT_FILENAME}; $chpath =~ s/[^\/]+$//; chdir($chpath); undef $chpath; }
 
-$set{'dlkey'} = 0;		# DLKey‚ğg—p‚·‚é=1,DLkey•K{=2
-$set{'up_ext'} = 'txt,lzh,zip,rar,gca,mpg,mp3,avi,swf,bmp,jpg,gif,png'; #ƒAƒbƒvƒ[ƒh‚Å‚«‚éŠî–{Šg’£q ”¼Šp‰p”¬•¶š ,‚Å‹æØ‚é
-$set{'up_all'} = 0;		#“o˜^ˆÈŠO‚Ì‚à‚Ì‚àUP‚³‚¹‚ç‚ê‚é‚æ‚¤‚É‚·‚é=1
-$set{'ext_org'} = 0;	#$set{'up_all'}‚ª1‚ÌƒIƒŠƒWƒiƒ‹‚ÌŠg’£q‚É‚·‚é=1
-$set{'deny_ext'} = 'php,php3,phtml,rb,sh,bat,dll'; 	#“Še‹Ö~‚ÌŠg’£q ”¼Šp‰p”¬•¶š ,‚Å‹æØ‚é
-$set{'change_ext'} = 'cgi->txt,pl->txt,log->txt,jpeg->jpg,mpeg->mpg';		#Šg’£q•ÏŠ· ‘O->Œã ”¼Šp‰p”¬•¶š ,‚Å‹æØ‚é
+our %set;
+our %in;
 
-$set{'home_url'} = '';		#[HOME]‚ÌƒŠƒ“ƒNæ ‘Š‘ÎƒpƒX–”‚Í http://‚©‚çn‚Ü‚éâ‘ÎƒpƒX
-$set{'html_all'} = 1;		#[ALL]‚ğo‚·=1
-$set{'dummy_html'} = 0;		#ƒtƒ@ƒCƒ‹ŒÂ•ÊHTML‚ğì¬‚·‚é ’Êíƒtƒ@ƒCƒ‹‚Ì‚İ=1,DLKeyİ’èƒtƒ@ƒCƒ‹‚Ì‚İ=2,‚·‚×‚Ä=3
-$set{'find_crypt'} = 1;		#ˆÃ†‰»ZIP‚ğŒŸo‚·‚é=1
-$set{'binary_compare'} = 0;		#Šù‘¶ƒtƒ@ƒCƒ‹‚ÆƒoƒCƒiƒŠ”äŠr‚·‚é=1
-$set{'post_flag'} = 0;		#PostKey‚ğg—p‚·‚é=1
-$set{'post_key'} = 'postkey';		#PostKey ,‚Å‹æØ‚é‚Æ•¡”w’è ex.(postkey1,postkey2)
-$set{'disp_error'} = 1;		#ƒ†[ƒU[‚ÉƒGƒ‰[‚ğ•\¦‚·‚é=1
-$set{'error_level'} = 1;		#ƒGƒ‰[ƒƒO‚ğ‹L˜^‚·‚é=1
-$set{'error_log'} = './error.cgi';		#ƒGƒ‰[ƒƒOƒtƒ@ƒCƒ‹–¼
-$set{'error_size'} = 1024;	# ƒGƒ‰[ƒƒOÅ‘å—e—Ê(KB) §ŒÀ‚È‚µ=0
-$set{'zero_clear'} = 1;		#ƒtƒ@ƒCƒ‹‚ªŒ©‚Â‚©‚ç‚È‚¢ê‡ƒƒO‚©‚çíœ‚·‚é=1
+$set{'log_file'} = './log/upload.log';	#ãƒ­ã‚°ãƒ•ã‚¡ã‚¤ãƒ«å
+$set{'max_log_flag'} = 0;				#ä¿æŒä»¶æ•°åˆ¶é™ã‚’ä½¿ç”¨ã™ã‚‹=1
+$set{'max_log'} = 30;					#ä¿æŒä»¶æ•°
+$set{'max_size'} = 10*1024;				#æœ€å¤§æŠ•ç¨¿å®¹é‡(KB)
+$set{'min_flag'} = 0;					#æœ€å°å®¹é‡åˆ¶é™ã‚’ä½¿ç”¨ã™ã‚‹=1
+$set{'min_size'} = 100;					#æœ€å°æŠ•ç¨¿å®¹é‡(KB)
+$set{'max_all_flag'} = 0;				#ç·å®¹é‡åˆ¶é™ã‚’ä½¿ç”¨ã™ã‚‹=1
+$set{'max_all_size'} = 20*1024;			#ç·åˆ¶é™å®¹é‡(KB)
+$set{'file_pre'} = 'up';				#ãƒ•ã‚¡ã‚¤ãƒ«æ¥é ­è¾
+$set{'pagelog'} = 10;					#1ãƒšãƒ¼ã‚¸ã«è¡¨ç¤ºã™ã‚‹ãƒ•ã‚¡ã‚¤ãƒ«æ•°
+$set{'base_html'} = 'index.html';		#1ãƒšãƒ¼ã‚¸ç›®ã®ãƒ•ã‚¡ã‚¤ãƒ«å
+$set{'interval'} = 0;					#åŒä¸€IPæŠ•ç¨¿é–“éš”ç§’æ•°
+$set{'deny_host'} = '';					#æŠ•ç¨¿ç¦æ­¢IP/HOST ,ã§åŒºåˆ‡ã‚‹ ex.(bbtec.net,219.119.66,ac.jp)
+$set{'admin_name'} = 'admin';			#ç®¡ç†è€…ãƒ­ã‚°ã‚¤ãƒ³ID
+$set{'admin_pass'} = '1234';			#ç®¡ç†è€…ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰
 
-$set{'disp_comment'} = 1; 	#ƒRƒƒ“ƒg‚ğ•\¦‚·‚é=1
-$set{'disp_date'} = 1;		#“ú•t‚ğ•\¦‚·‚é=1
-$set{'disp_size'} = 1;		#ƒTƒCƒY‚ğ•\¦‚·‚é=1
-$set{'disp_mime'} = 1;		#MIMETYPE‚ğ•\¦‚·‚é=1
-$set{'disp_orgname'} = 1;	#ƒIƒŠƒWƒiƒ‹ƒtƒ@ƒCƒ‹–¼‚ğ•\¦‚·‚é=1
+$set{'mail_notify'} = 0;					#ãƒ¡ãƒ¼ãƒ«é€šçŸ¥ã‚’ä½¿ã†
+$set{'mail_server'} = 'localhost';			#SMTPã‚µãƒ¼ãƒ
+$set{'mail_port'} = 25;						#SMTPãƒãƒ¼ãƒˆ
+$set{'notify_to'} = 'admin@example.com';	#ãƒ¡ãƒ¼ãƒ«é€šçŸ¥ã®å®›å…ˆã‚¢ãƒ‰ãƒ¬ã‚¹
+$set{'notify_from'} = 'notify@example.com';	#ãƒ¡ãƒ¼ãƒ«é€šçŸ¥ã®é€ä¿¡å…ƒã‚¢ãƒ‰ãƒ¬ã‚¹
+$set{'smtp_auth'} = 0;						#POP before SMTPèªè¨¼ã‚’è¡Œã†
+$set{'pop_server'} = 'localhost';			#POP3ã‚µãƒ¼ãƒ
+$set{'pop_port'} = 110;						#POP3ãƒãƒ¼ãƒˆ
+$set{'pop_userid'} = '';					#POP3ãƒ­ã‚°ã‚¤ãƒ³ID
+$set{'pop_passwd'} = '';					#POP3ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰
 
-$set{'per_upfile'} = 0666;		#ƒAƒbƒvƒ[ƒhƒtƒ@ƒCƒ‹‚Ìƒp[ƒ~ƒbƒVƒ‡ƒ“ suexec=0604,other=0666
-$set{'per_dir'} = 0777;		#ƒ\[ƒXƒAƒbƒvƒfƒBƒŒƒNƒgƒŠ‚Ìƒp[ƒ~ƒbƒVƒ‡ƒ“ suexec=0701,other=0777
-$set{'per_logfile'} = 0666;		#ƒƒOƒtƒ@ƒCƒ‹‚Ìƒp[ƒ~ƒbƒVƒ‡ƒ“@suexec=0600,other=0666
-$set{'link_target'} = '';		#target‘®«
+# ä»¥ä¸‹7é …ç›®ã‚’å†è¨­å®šã™ã‚‹éš›ã«ã¯PATHï¼Œãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªã¯ / ã§çµ‚ã‚ã‚‹ã“ã¨
+# $set{'html_dir'}, $set{'base_cgi'}ã‚’ ./ ä»¥å¤–ã«è¨­å®šã™ã‚‹å ´åˆ,
+# ã¾ãŸã¯DLkeyã‚’ä½¿ç”¨ã— ãªãŠã‹ã¤HTMLã‚­ãƒ£ãƒƒã‚·ãƒ¥($set{'dummy_html'} = 2 or 3)ã‚’ä½¿ç”¨ã™ã‚‹å ´åˆã¯
+# $set{'base_cgi'} , $set{'http_html_path'} , $set{'http_src_path'} , $set{'img_dir'}ã‚’
+# ãƒ•ãƒ«ãƒ‘ã‚¹(http://ï½ï½ or /ï½ï½)ã§è¨˜è¿°ã™ã‚‹
+$set{'html_dir'} = './';			#å†…éƒ¨HTMLä¿å­˜ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒª
+$set{'src_dir'} = './src/';			#å†…éƒ¨ãƒ•ã‚¡ã‚¤ãƒ«ä¿å­˜ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒª
+$set{'thumb_dir'} = './thumb/';		#ã‚µãƒ ãƒã‚¤ãƒ«ä¿å­˜ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒª
+$set{'base_cgi'} = './upload.pl';	#ã“ã®ã‚¹ã‚¯ãƒªãƒ—ãƒˆå http://ï½ã®æŒ‡å®šå¯èƒ½
+$set{'http_html_path'} = './';		#htmlå‚ç…§ httpPATH http://ï½ã®æŒ‡å®šå¯èƒ½
+$set{'http_src_path'} = './src/';	#fileå‚ç…§ httpPATH http://ï½ã®æŒ‡å®šå¯èƒ½
+$set{'img_dir'} = './img/';			#css, jsã®å‚ç…§å…ˆ http://ï½ã®æŒ‡å®šå¯èƒ½
+
+$set{'dlkey'} = 0;		# DLKeyã‚’ä½¿ç”¨ã™ã‚‹=1,DLkeyå¿…é ˆ=2
+# ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã§ãã‚‹åŸºæœ¬æ‹¡å¼µå­ åŠè§’è‹±æ•°å°æ–‡å­— ,ã§åŒºåˆ‡ã‚‹
+$set{'up_ext'} = 'bmp,class,css,dat,gca,gif,hta,jar,java,jpg,js,lzh,png,rar,swf,txt,vbs,wsf,xml,zip';
+$set{'up_all'} = 0;		#ç™»éŒ²ä»¥å¤–ã®ã‚‚ã®ã‚‚UPã•ã›ã‚‰ã‚Œã‚‹ã‚ˆã†ã«ã™ã‚‹=1
+$set{'ext_org'} = 0;	#$set{'up_all'}ãŒ1ã®æ™‚ã‚ªãƒªã‚¸ãƒŠãƒ«ã®æ‹¡å¼µå­ã«ã™ã‚‹=1
+# æŠ•ç¨¿ç¦æ­¢ã®æ‹¡å¼µå­ åŠè§’è‹±æ•°å°æ–‡å­— ,ã§åŒºåˆ‡ã‚‹
+$set{'deny_ext'} = 'php,php3,phtml,rb,sh,bat,dll';
+# æ‹¡å¼µå­å¤‰æ› å‰->å¾Œ åŠè§’è‹±æ•°å°æ–‡å­— ,ã§åŒºåˆ‡ã‚‹
+$set{'change_ext'} = 'cgi->txt,pl->txt,log->txt,jpeg->jpg,mpeg->mpg';
+
+$set{'home_url'} = '';					#[HOME]ã®ãƒªãƒ³ã‚¯å…ˆ ç›¸å¯¾ãƒ‘ã‚¹åˆã¯ http://ã‹ã‚‰å§‹ã¾ã‚‹çµ¶å¯¾ãƒ‘ã‚¹
+$set{'html_all'} = 0;					#[ALL]ã‚’å‡ºã™=1
+$set{'dummy_html'} = 0;					#ãƒ•ã‚¡ã‚¤ãƒ«å€‹åˆ¥HTMLã‚’ä½œæˆã™ã‚‹ é€šå¸¸ãƒ•ã‚¡ã‚¤ãƒ«ã®ã¿=1,DLKeyè¨­å®šãƒ•ã‚¡ã‚¤ãƒ«ã®ã¿=2,ã™ã¹ã¦=3
+$set{'find_crypt'} = 1;					#æš—å·åŒ–ZIPã‚’æ¤œå‡ºã™ã‚‹=1
+$set{'binary_compare'} = 0;				#æ—¢å­˜ãƒ•ã‚¡ã‚¤ãƒ«ã¨ãƒã‚¤ãƒŠãƒªæ¯”è¼ƒã™ã‚‹=1
+$set{'post_flag'} = 0;					#PostKeyã‚’ä½¿ç”¨ã™ã‚‹=1
+$set{'post_key'} = 'postkey';			#PostKey ,ã§åŒºåˆ‡ã‚‹ã¨è¤‡æ•°æŒ‡å®š ex.(postkey1,postkey2)
+$set{'disp_error'} = 1;					#ãƒ¦ãƒ¼ã‚¶ãƒ¼ã«ã‚¨ãƒ©ãƒ¼ã‚’è¡¨ç¤ºã™ã‚‹=1
+$set{'error_level'} = 1;				#ã‚¨ãƒ©ãƒ¼ãƒ­ã‚°ã‚’è¨˜éŒ²ã™ã‚‹=1
+$set{'error_log'} = './log/error.log';	#ã‚¨ãƒ©ãƒ¼ãƒ­ã‚°ãƒ•ã‚¡ã‚¤ãƒ«å
+$set{'error_size'} = 1024;				#ã‚¨ãƒ©ãƒ¼ãƒ­ã‚°æœ€å¤§å®¹é‡(KB) åˆ¶é™ãªã—=0
+$set{'zero_clear'} = 1;					#ãƒ•ã‚¡ã‚¤ãƒ«ãŒè¦‹ã¤ã‹ã‚‰ãªã„å ´åˆãƒ­ã‚°ã‹ã‚‰å‰Šé™¤ã™ã‚‹=1
+
+$set{'disp_comment'} = 1; 	#ã‚³ãƒ¡ãƒ³ãƒˆã‚’è¡¨ç¤ºã™ã‚‹=1
+$set{'disp_date'} = 1;		#æ—¥ä»˜ã‚’è¡¨ç¤ºã™ã‚‹=1
+$set{'disp_size'} = 1;		#ã‚µã‚¤ã‚ºã‚’è¡¨ç¤ºã™ã‚‹=1
+$set{'disp_mime'} = 0;		#MIMETYPEã‚’è¡¨ç¤ºã™ã‚‹=1
+$set{'disp_orgname'} = 0;	#ã‚ªãƒªã‚¸ãƒŠãƒ«ãƒ•ã‚¡ã‚¤ãƒ«åã‚’è¡¨ç¤ºã™ã‚‹=1
+$set{'disp_thumb'} = 1;		#ã‚µãƒ ãƒã‚¤ãƒ«ã‚’è¡¨ç¤ºã™ã‚‹=1
+
+$set{'per_upfile'} = 0666;	#ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ãƒ•ã‚¡ã‚¤ãƒ«ã®ãƒ‘ãƒ¼ãƒŸãƒƒã‚·ãƒ§ãƒ³ suexec=0604,other=0666
+$set{'per_dir'} = 0777;		#ã‚½ãƒ¼ã‚¹ã‚¢ãƒƒãƒ—ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªã®ãƒ‘ãƒ¼ãƒŸãƒƒã‚·ãƒ§ãƒ³ suexec=0701,other=0777
+$set{'per_logfile'} = 0666;	#ãƒ­ã‚°ãƒ•ã‚¡ã‚¤ãƒ«ã®ãƒ‘ãƒ¼ãƒŸãƒƒã‚·ãƒ§ãƒ³ã€€suexec=0600,other=0666
+$set{'link_target'} = '';	#targetå±æ€§
 
 #------
-$set{'ver'} = '2005/10/10e CGI.pm';
-$set{'char_delname'} = 'D';
+$set{'ver'} = '2005/10/10e CGI.pm + mod.1603072206';
+if(defined($ENV{'MOD_PERL'})){ $set{'ver'} .= ' + ' .$ENV{'MOD_PERL'}; }
+$set{'char_delname'} = 'æ¶ˆ';
 
-$in{'time'} = time(); $in{'date'} = conv_date($in{'time'});
+$in{'time'} = time(); $in{'date'} = &snup::conv_date($in{'time'});
 $in{'addr'} = $ENV{'REMOTE_ADDR'};
 $in{'host'} = gethostbyaddr(pack('C4',split(/\./, $in{'addr'})), 2) || $ENV{'REMOTE_HOST'} || '(none)';
+
 if($in{'addr'} eq $in{'host'}){ $in{'host'} = '(none)'; }
 
-$set{'html_head'} =<<"EOM";
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html lang="ja">
-<HEAD>
-<META name="robots" content="noindex,nofollow">
-<META name="ROBOTS" content="NOINDEX,NOFOLLOW">
-<META http-equiv="Content-type" content="text/html; charset=Shift_JIS">
-<META http-equiv="Pragma" content="no-cache">
-<META http-equiv="Cache-Control" content="no-cache">
-<META http-equiv="Expires" content="0">
-<TITLE>Uploader</TITLE>
+#ã‚¿ã‚¤ãƒˆãƒ«
+$set{'html_title'} = 'Uploader';
+
+#èª¬æ˜
+$set{'html_desc'} = <<"EOM";
+	<ul>
+		<li>ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ€ãƒ¼ã§ã™ã€‚</li>
+		<li>ç”»åƒã‚’ä¸Šã’ã‚‹ã¨ã‚µãƒ ãƒã‚¤ãƒ«ãŒç”Ÿæˆã•ã‚Œã¾ã™ã€‚</li>
+		<li>ç”»åƒã˜ã‚ƒãªãã¦ã‚‚è‰²ã€…ä¸Šã’ã‚‰ã‚Œã¾ã™ã€‚</li>
+		<li style="color:#f00">æ³¨: DELKeyã‚’ç©ºç™½ã«ã™ã‚‹ã¨upæ™‚ã¨ç•°ãªã‚‹IPã‹ã‚‰ãƒ•ã‚¡ã‚¤ãƒ«å‰Šé™¤ãŒã§ããªããªã‚Šã¾ã™ã€‚</li>
+	</ul>
+	<hr />
 EOM
 
-$set{'html_css'} =<<"EOM";
-<META http-equiv="Content-Style-Type" content="text/css">
-<STYLE type="text/css"><!--
-input,td{ font-size: 10pt;font-family:Chicago,Verdana,Arial,sans-serif,"‚l‚r ‚oƒSƒVƒbƒN"; }
-a:hover { background-color:#EECCCC; }
-input,textarea{	border-top : 1px solid ; border-bottom : 1px solid ; border-left : 1px solid ; border-right : 1px solid ;font-size:10pt;background-color:#FFFFFF; }
--->
-</STYLE>
+#HTMLãƒ˜ãƒƒãƒ€
+$set{'html_head'} = <<"EOM";
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html>
+<html lang="ja-jp" xml:lang="ja-jp" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta charset="UTF-8" />
+	<title>$set{'html_title'}</title>
+	<!--[if lte IE 8]>
+		<script type="text/javascript" src="$set{'img_dir'}html5.js"></script>
+		<link rel="stylesheet" href="$set{'img_dir'}html5.css" type="text/css" />
+	<![endif]-->
+	<link rel="stylesheet" href="$set{'img_dir'}style.css" type="text/css" />
 EOM
 
-unless(-e $set{'log_file'}){ &init; }
-unless(-e $set{'base_html'}){ &makehtml; }
+&snup::main();
 
-{ #ƒfƒR[ƒh
-	if ($ENV{'REQUEST_METHOD'} eq "POST" && $ENV{'CONTENT_TYPE'} =~ /multipart\/form-data/i){
-		if ($ENV{'CONTENT_LENGTH'} > ($set{'max_size'} * 1024 + 1024)){ if($ENV{'SERVER_SOFTWARE'} =~ /IIS/){ while(read(STDIN,my $buff,8192)){} } &error(106,$ENV{'CONTENT_LENGTH'});}
- 	}else{
- 		if ($ENV{'CONTENT_LENGTH'} > 1024*100){ error(98); }
- 	}
-	my %ck; foreach(split(/;/,$ENV{'HTTP_COOKIE'})){ my($key,$val) = split(/=/); $key =~ s/\s//g; $ck{$key} = $val;}
-	my @ck = split(/<>/,$ck{'SN_USER'});
-	if(length($ck[0]) < 5){ 
+#å¤‰æ•°ç ´æ£„
+undef %set;
+undef %in;
+
+
+BEGIN{
+sub main{
+
+unless(-e $set{'log_file'}){ &snup::init; }
+unless(-e $set{'base_html'}){ &snup::makehtml; }
+
+{ #ãƒ‡ã‚³ãƒ¼ãƒ‰
+	my $q = new CGI;
+
+	my $postsize = defined($q->param('POSTDATA')) ? length($q->param('POSTDATA')) : 0;
+	if ($ENV{'REQUEST_METHOD'} eq 'POST' && $ENV{'CONTENT_TYPE'} =~ /multipart\/form-data/i){
+		if($postsize > ($set{'max_size'} * 1024 + 1024)){ &snup::error(106, $postsize); }
+	}else{
+		if($postsize > 1024*100){ &snup::error(98); }
+	}
+
+	my(%ck, @ck);
+	if(defined($ENV{'HTTP_COOKIE'})){
+		foreach(split(/;/, $ENV{'HTTP_COOKIE'})){ my($key, $val) = split(/=/); $key =~ s/\s//g; $ck{$key} = $val;}
+		@ck = split(/<>/, $ck{'SN_USER'});
+	}else{ @ck = (''); }
+	if(length($ck[0]) < 5){
 		my @salt = ('a'..'z', 'A'..'Z', '0'..'9', '.', '/'); srand;
 		my $salt = $salt[int(rand(@salt))] . $salt[int(rand(@salt))];
 		$in{'user'} = crypt($in{'addr'}.$in{'time'}, $salt);
 	}else{ $in{'user'} = $ck[0]; }
-	
-	my $q = new CGI;
-	$in{'upfile'} = $q->param('upfile');
-	$in{'tmpfile'} = $q->tmpFileName($in{'upfile'});
-	$in{'type'} = $q->uploadInfo($in{'upfile'})->{'Content-Type'} if ($in{'upfile'});
-	$in{'pass'} = $q->param('pass');	$in{'mode'} = $q->param('mode');	
-	$in{'delno'} = $q->param('delno');	$in{'comment'} = $q->param('comment');
-	$in{'jcode'} = $q->param('jcode');	$in{'delpass'} = $q->param('delpass');
-	$in{'orgname'} = $in{'upfile'};	$in{'postkey'} = $q->param('postkey');
-	$in{'org_pass'} = $in{'pass'};
-	$in{'checkmode'} = $q->param('checkmode');
-	$in{'file'} = $q->param('file');	$in{'dlkey'} = $q->param('dlkey');
-	$in{'admin_delno'} = join(',',$q->param('admin_delno'));
-	my @denyhost = split(/,/,$set{'deny_host'});
+
+	$in{'upfile'} = $q->param('upfile') || 0;
+	$in{'tmpfile'} = $q->tmpFileName($in{'upfile'}) || 0;
+	$in{'type'} = $in{'upfile'} ? $q->uploadInfo($in{'upfile'})->{'Content-Type'} : '';
+	$in{'pass'} = $q->param('pass') || '';
+	$in{'mode'} = $q->param('mode') || '';
+	$in{'delno'} = $q->param('delno') || '';
+	$in{'comment'} = $q->param('comment') || '';
+	$in{'jcode'} = $q->param('jcode') || '';
+	$in{'delpass'} = $q->param('delpass') || '';
+	$in{'orgname'} = $in{'upfile'};
+	$in{'postkey'} = $q->param('postkey') || '';
+	$in{'org_pass'} = $in{'pass'} || '';
+	$in{'checkmode'} = $q->param('checkmode') || '';
+	$in{'file'} = $q->param('file');
+	$in{'dlkey'} = $q->param('dlkey') || '';
+	$in{'admin_delno'} = join(',', $q->param('admin_delno'));
+	my @denyhost = split(/,/, $set{'deny_host'});
 	foreach my $value (@denyhost){
-		if ($in{'addr'} =~ /$value/ || $in{'host'} =~ /$value/){ &error(101);}
+		if ($in{'addr'} =~ /$value/ || $in{'host'} =~ /$value/){ &snup::error(101);}
 	}
 
-	my @form = ($in{'comment'},$in{'orgname'},$in{'type'},$in{'dlkey'});
-	foreach my $value (@form) {
-		if (length($value) > 128) { $value = substr($value,0,128).'...'; }
-#		$value =~ s/&/&amp;/g;
-		$value =~ s/"/&quot;/g;
-		$value =~ s/</&lt;/g;
-		$value =~ s/>/&gt;/g;
-		$value =~ s/\r//g;
-		$value =~ s/\n//g;
-		$value =~ s/\t//g;
-		$value =~ s/\0//g;
+	my @form = ($in{'comment'}, $in{'orgname'}, $in{'type'}, $in{'dlkey'});
+	my $aaa;
+	foreach my $value (@form){
+		if(defined($value)){
+			if (length($value) > 128){ $value = substr($value, 0, 128).'...'; }
+			$value =~ s/&/&amp;/g;
+			$value =~ s/"/&quot;/g;
+			$value =~ s/</&lt;/g;
+			$value =~ s/>/&gt;/g;
+			$value =~ s/\r//g;
+			$value =~ s/\n//g;
+			$value =~ s/\t//g;
+			$value =~ s/\0//g;
+		}
 	}
-	($in{'comment'},$in{'orgname'},$in{'type'},$in{'dlkey'}) = @form;
-	 $in{'tmpfile2'} = &filewrite() if ($in{'upfile'});
+	($in{'comment'}, $in{'orgname'}, $in{'type'}, $in{'dlkey'}) = @form;
+	 $in{'tmpfile2'} = &snup::filewrite() if ($in{'upfile'});
 }
 
-if($in{'delno'} eq $set{'admin_name'} && $in{'delpass'} eq $set{'admin_pass'}){ &admin_mode(); }
-if(!$in{'delno'} && $in{'delpass'} eq $set{'admin_pass'}){ &makehtml(); &quit(); }
-if($in{'mode'} eq 'dl'){ &dlfile;} #DL
-if($in{'mode'} eq 'delete'){ &delete(); &quit(); }
+if($in{'delno'} eq $set{'admin_name'} && $in{'delpass'} eq $set{'admin_pass'}){ &snup::admin_mode(); }
+if(!$in{'delno'} && $in{'delpass'} eq $set{'admin_pass'}){ &snup::makehtml(); &snup::quit(); }
+if($in{'mode'} eq 'dl'){ &snup::dlfile;} #DL
+if($in{'mode'} eq 'delete'){ &snup::delete(); &snup::quit(); }
 
-{#ƒƒCƒ“ˆ—
-	if(!$in{'upfile'}){ &error(99); }
-	if($set{'post_flag'} && !check_postkey($in{'postkey'})){ error(109); }
-	if($set{'dlkey'} == 2 && !$in{'dlkey'}){ unlink("$in{'tmpfile2'}"); &error(61); }
-	open(IN,$set{'log_file'})||&error(303);
+{#ãƒ¡ã‚¤ãƒ³å‡¦ç†
+	if(!$in{'upfile'}){ &snup::error(99); }
+	if($set{'post_flag'} && !&snup::check_postkey($in{'postkey'})){ &snup::error(109); }
+	if($set{'dlkey'} == 2 && !$in{'dlkey'}){ unlink("$in{'tmpfile2'}"); &snup::error(61); }
+	open(IN, $set{'log_file'}) || &snup::error(303);
 	my @log = <IN>;
 	close(IN);
-	my ($no,$lastip,$lasttime) = split(/<>/,$log[0]);
+	my ($no, $lastip, $lasttime) = split(/<>/, $log[0]);
 
-	if($set{'interval'} && $set{'interval'} && $in{'time'} <= ($lasttime + $set{'interval'}) && $in{'addr'} eq $lastip){ &error(203);}
-	$in{'ext'} = extfind($in{'orgname'}); if(!$in{'ext'} && $in{'upfile'}){ &error(202); }
+	if($set{'interval'} && $set{'interval'} && $in{'time'} <= ($lasttime + $set{'interval'}) && $in{'addr'} eq $lastip){ &snup::error(203);}
+	$in{'ext'} = &snup::extfind($in{'orgname'}); if(!$in{'ext'} && $in{'upfile'}){ &snup::error(202); }
 
 	my $orgname;
-	if(split(/\//,$in{'orgname'}) > split(/\\/,$in{'orgname'})){	my @name = split(/\//,$in{'orgname'}); $orgname = $name[$#name]; }
-	else{ my @name = split(/\\/,$in{'orgname'}); $orgname = $name[$#name];}
-	
+	if((() = $in{'orgname'} =~ /\//g) > (() = $in{'orgname'} =~ /\\/g)){	my @name = split(/\//, $in{'orgname'}); $orgname = $name[$#name]; }
+	else{ my @name = split(/\\/, $in{'orgname'}); $orgname = $name[$#name];}
+
 	my @salt = ('a'..'z', 'A'..'Z', '0'..'9', '.', '/');
 	srand;
 	my $salt = $salt[int(rand(@salt))] . $salt[int(rand(@salt))];
 	$in{'pass'} = crypt($in{'pass'}, $salt);
 
 	if($set{'binary_compare'}){
-		my @files = globfile("$set{'src_dir'}",".*");
-		my @dir = globdir("$set{'src_dir'}",".*");
-		foreach my $dir (@dir){	push(@files,globfile($dir."/",".*")); }
+		my @files = &snup::globfile("$set{'src_dir'}", ".*");
+		my @dir = &snup::globdir("$set{'src_dir'}", ".*");
+		foreach my $dir (@dir){ push(@files, &snup::globfile($dir."/", ".*")); }
 		foreach my $value (@files){
 			next if($value =~ /\.temporary$/);
-			if(binarycmp($in{'tmpfile2'},$value)){ unlink($in{'tmpfile2'}); &error(205,$value);}
+			if(&snup::binarycmp($in{'tmpfile2'}, $value)){ unlink($in{'tmpfile2'}); &snup::error(205, $value);}
 		}
 	}
 
 	if($set{'find_crypt'}){
-		open(FILE,$in{'tmpfile'}); binmode(FILE); seek(FILE,0,0); read(FILE,my $buff,4); my $crypt_flag = 0;
-		if($buff =~ /^\x50\x4b\x03\x04$/){ seek(FILE,6,0); read(FILE,my $buff,1); $crypt_flag = 1 if(($buff & "\x01") eq "\x01"); }
+		open(FILE, $in{'tmpfile2'}); binmode(FILE); seek(FILE, 0, 0); read(FILE,my $buff, 4); my $crypt_flag = 0;
+		if($buff =~ /^\x50\x4b\x03\x04$/){ seek(FILE, 6, 0); read(FILE,my $buff, 1); $crypt_flag = 1 if(($buff & "\x01") eq "\x01"); }
 		close(FILE);
-		$in{'comment'} = '<font color="#FF0000">*</font>'.$in{'comment'} if($crypt_flag);
+		$in{'comment'} = '<span class="red">*</span>'.$in{'comment'} if($crypt_flag);
 	}
 
-	open(IN,$set{'log_file'})||&error(303);
+	open(IN, $set{'log_file'}) || &snup::error(303);
 	@log = <IN>;
 	close(IN);
-	($no,$lastip,$lasttime) = split(/<>/,$log[0]);
+	($no, $lastip, $lasttime) = split(/<>/, $log[0]);
 	shift(@log);
 	$no++;
-	my $tmpno = sprintf("%04d",$no);
+	my $tmpno = sprintf("%04d", $no);
 
 	my $dlsalt;
 	my $filedir;
@@ -197,56 +262,99 @@ if($in{'mode'} eq 'delete'){ &delete(); &quit(); }
 
 	if($set{'dlkey'} && $in{'dlkey'}){
 		my @salt = ('a'..'z', 'A'..'Z', '0'..'9'); srand;
-		for (my $c = 1; $c <= 20; ++$c) { $dlsalt .= $salt[int(rand(@salt))]; }
+		for (my $c = 1; $c <= 20; ++$c){ $dlsalt .= $salt[int(rand(@salt))]; }
 	 	$filedir = "$set{'src_dir'}$set{'file_pre'}${tmpno}.$in{'ext'}_$dlsalt/";
-		mkdir($filedir,$set{'per_dir'});
-		rename("$in{'tmpfile2'}","$filedir$set{'file_pre'}$tmpno.$in{'ext'}");
-		open(OUT,">${filedir}index.html");
+		mkdir($filedir, $set{'per_dir'});
+		rename("$in{'tmpfile2'}", "$filedir$set{'file_pre'}$tmpno.$in{'ext'}");
+		open(OUT, ">${filedir}index.html");
 		close(OUT);
-		chmod($set{'per_upfile'},"${filedir}index.html");
-		$in{'comment'} = '<font color="#FF0000">[DLKey] </font>'.$in{'comment'};
+		chmod($set{'per_upfile'}, "${filedir}index.html");
+		$in{'comment'} = '<span class="red">[DLKey] </span>'.$in{'comment'};
 	}else{
-		undef $in{'dlkey'};
-		rename("$in{'tmpfile2'}","$set{'src_dir'}$set{'file_pre'}$tmpno.$in{'ext'}");
+		$in{'dlkey'} = 0;
+		rename("$in{'tmpfile2'}", "$set{'src_dir'}$set{'file_pre'}$tmpno.$in{'ext'}");
 	}
 
-	if (length($orgname) > 128) { $orgname = substr($orgname,0,128).'...'; }
+	# ã‚µãƒ ãƒã‚¤ãƒ«ä½œæˆ
+	require Image::Magick;
+	my $thumb = Image::Magick->new;
+	# ImageMagickã§ã¯ã‚«ãƒ¬ãƒ³ãƒˆãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªãŒå¤‰ã‚ã‚‰ãªã„å¯¾ç­–
+	my $chpath = $ENV{SCRIPT_FILENAME};
+	$chpath =~ s/[^\/]+$//;
+	unless($set{'dlkey'} && $in{'dlkey'}){
+		if($in{'type'} =~ /bmp|gif|jpe?g|png/){ # ç”»åƒãƒ•ã‚¡ã‚¤ãƒ«
+			$thumb->Read("${chpath}$set{'src_dir'}$set{'file_pre'}${tmpno}.$in{'ext'}");
+			my $w = $thumb->Get('width');
+			my $h = $thumb->Get('height');
+			my $ts = $w < $h ? $w : $h;
+			my $tx = ($w - $ts) /2;
+			my $ty = ($h - $ts) /2;
+			$thumb->Crop(width=>$ts, height=>$ts, x=>$tx, y=>$ty);
+			$thumb->Resize(width=>100, height=>100);
+			$thumb->Set(quality=>90);
+			$thumb->Write("${chpath}$set{'thumb_dir'}$set{'file_pre'}${tmpno}.jpg");
+		}elsif($in{'type'} =~ /zip|lzh|rar/){ # zipãƒ•ã‚¡ã‚¤ãƒ«
+			$thumb->Read("${chpath}$set{'thumb_dir'}_zip.jpg");
+			$thumb->Write("${chpath}$set{'thumb_dir'}$set{'file_pre'}${tmpno}.jpg");
+		}else{ # ãã®ä»–
+			$thumb->Read("${chpath}$set{'thumb_dir'}_noimage.jpg");
+			$thumb->Write("${chpath}$set{'thumb_dir'}$set{'file_pre'}${tmpno}.jpg");
+		}
+	}else{ # ãƒ‘ã‚¹ä»˜ã
+		$thumb->Read("${chpath}$set{'thumb_dir'}_noimage.jpg");
+		$thumb->Write("${chpath}$set{'thumb_dir'}$set{'file_pre'}${tmpno}.jpg");
+	}
+	undef $thumb;
+	undef $chpath;
+
+	if (length($orgname) > 128){ $orgname = substr($orgname, 0, 128).'...'; }
 
 	my @note;
 	if($set{'post_flag'} && $set{'post_key'}){
-		push(@note,'PostKey:'.$in{'postkey'});
+		push(@note, 'PostKey:'.$in{'postkey'});
 	}
 	if($ENV{'SERVER_SOFTWARE'} =~ /Apache|IIS/){
 		my $disptime;
 		my $time = time() - $in{'time'};
-		my @str = ('Upload:','•b');
-		my $disptime = $time.$str[1];
-		push(@note,$str[0].$disptime);
+		my @str = ('Upload:', 'ç§’');
+		$disptime = $time.$str[1];
+		push(@note, $str[0].$disptime);
 	}
 	if($in{'dlkey'}){
 		my @salt = ('a'..'z', 'A'..'Z', '0'..'9', '.', '/'); srand;
 		my $salt = $salt[int(rand(@salt))] . $salt[int(rand(@salt))];
 		my $crypt_dlkey  = crypt($in{'dlkey'}, $salt);
-		push(@note,"DLKey<!-- DLKey:".$crypt_dlkey." --><!-- DLpath:".$dlsalt." -->");
+		push(@note, "DLKey<!-- DLKey:".$crypt_dlkey." --><!-- DLpath:".$dlsalt." -->");
 	}
-	my $note = join(',',@note);
-	my $usersalt = substr($in{'user'},0,2);
-	my $userid = crypt($in{'user'},$usersalt);
+	my $note = join(',', @note);
+	my $usersalt = substr($in{'user'}, 0, 2);
+	my $userid = crypt($in{'user'}, $usersalt);
 	$in{'time'} = time();
-#	$in{'date'} = conv_date(time());
+#	$in{'date'} = &snup::conv_date(time());
 	my @new;
 	$new[0] = "$no<>$in{'addr'}<>$in{'time'}<>1\n";
-	my $addlog = "$no<>$in{'ext'}<>$in{'date'}<>$in{'comment'}<>$in{'type'}<>$orgname<>$in{'addr'}<>$in{'host'}<>$in{'pass'},$userid<>$set{'file_pre'}<>$note<>1\n";
+	my $addlog = "$no<>$in{'ext'}<>$in{'date'}<>$in{'comment'}<>$in{'type'}<>$orgname<>$in{'addr'}<>$in{'host'}<>$in{'pass'}, $userid<>$set{'file_pre'}<>$note<>1\n";
 	$new[1] = $addlog;
 
-#	open(OUT,">>./alllog.cgi"); print OUT $addlog; close(OUT);
+#	open(OUT, ">>./alllog.cgi"); print OUT $addlog; close(OUT);
+	my $notification_body = <<"EOM";
+UPLOADED: $set{'file_pre'}$tmpno.$in{'ext'}
+UPLOADED_DATE: $in{'date'}
+COMMENT: $in{'comment'}
+MIME_TYPE: $in{'type'}
+ORIGINAL: $orgname
+REMOTE_ADDR: $in{'addr'}
+REMOTE_HOST: $in{'host'}
+NOTE: $note
+EOM
+	&snup::send_notification('File uploaded', $notification_body);
 
 	my $i = 2;
 
 	foreach my $value (@log){
-		my ($no,$ext,$date,$comment,$mime,$orgname,$addr,$host,$pass,$filepre,$note,$dummy) = split(/<>/,$value);
+		my ($no, $ext, $date, $comment, $mime, $orgname, $addr, $host, $pass, $filepre, $note, $dummy) = split(/<>/, $value);
 		if(!$dummy){ $filepre = $set{'file_pre'};}
-		$no = sprintf("%04d",$no);
+		$no = sprintf("%04d", $no);
 
 		my $filename;
 		my $filedir;
@@ -258,146 +366,211 @@ if($in{'mode'} eq 'delete'){ &delete(); &quit(); }
 			$filename = "$set{'src_dir'}$filepre$no.$ext";
 		}
 		$allsize += (-s $filename);
-		
-		if($i <= $set{'max_log'} && !($set{'max_all_flag'} && $set{'max_all_size'}*1024 < $allsize)){ 
-			if((-e $filename)||!$set{'zero_clear'}){ push(@new,$value); $i++; }
+
+		if((!$set{'max_log_flag'} || $i <= $set{'max_log'}) && !($set{'max_all_flag'} && $set{'max_all_size'}*1024 < $allsize)){
+			if((-e $filename) || !$set{'zero_clear'}){ push(@new, $value); $i++; }
 		}else{
 			if(unlink($filename)){
-				unlink("$set{'src_dir'}$filepre$no.$ext.html"); if($filedir){ foreach(globfile($filedir,".*")){ unlink; } } rmdir($filedir);
+				unlink("$set{'src_dir'}$filepre$no.$ext.html"); if($filedir){ foreach(&snup::globfile($filedir, ".*")){ unlink; } } rmdir($filedir);
 			}elsif(unlink($filename)){
-				unlink("$set{'src_dir'}$filepre$no.$ext.html"); if($filedir){ foreach(globfile($filedir,".*")){ unlink; } } rmdir($filedir);
+				unlink("$set{'src_dir'}$filepre$no.$ext.html"); if($filedir){ foreach(&snup::globfile($filedir, ".*")){ unlink; } } rmdir($filedir);
 			}elsif(-e $filename){
-				push(@new,$value);
+				push(@new, $value);
 			}else{
-				unlink("$set{'src_dir'}$filepre$no.$ext.html"); if($filedir){ foreach(globfile($filedir,".*")){ unlink; } } rmdir($filedir);
+				unlink("$set{'src_dir'}$filepre$no.$ext.html"); if($filedir){ foreach(&snup::globfile($filedir, ".*")){ unlink; } } rmdir($filedir);
 			}
 		}
 	}
-	logwrite(@new);
+	&snup::logwrite(@new);
 	if($in{'dlkey'} && ( $set{'dummy_html'} == 2 || $set{'dummy_html'} == 3)){
-		&makedummyhtml("$set{'file_pre'}$tmpno.$in{'ext'}",$in{'comment'},"$set{'file_pre'}$tmpno.$in{'ext'}",$dlsalt,$in{'date'},$in{'type'},$orgname,$no);
+		&snup::makedummyhtml("$set{'file_pre'}$tmpno.$in{'ext'}", $in{'comment'}, "$set{'file_pre'}$tmpno.$in{'ext'}", $dlsalt, $in{'date'}, $in{'type'}, $orgname, $no);
 	}elsif(!$in{'dlkey'} && ($set{'dummy_html'} == 1 || $set{'dummy_html'} == 3)){
-		&makedummyhtml("$set{'file_pre'}$tmpno.$in{'ext'}");
+		&snup::makedummyhtml("$set{'file_pre'}$tmpno.$in{'ext'}");
 	}
-	&makehtml(); &quit();
+	&snup::makehtml(); &snup::quit();
 }
+
+} # /sub main
 
 sub makehtml{
 
-	my ($buff,$init,$postval,$dlkey);
+	my $buff = '';
+	my $init = 0;
 	my $page = 0; my $i = 1;
-	
-	open(IN,$set{'log_file'})||&error(303);
+
+	open(IN, $set{'log_file'}) || &snup::error(303);
 	my $log = my @log = <IN>;
 	close(IN);
-	
+
 	if($log == 1){ $log++; $init++;}
-	my $lastpage = int(($log - 2)/$set{'pagelog'}) + 1;
-	$postval = ' obj.postkey.value =  unescape(p[1]);' if($set{'post_flag'});
-	my $header =<<"EOM";
-$set{'html_head'}<META http-equiv="Content-Script-Type" content="text/javascript">
-<script type="text/javascript">
-<!--
-function getCookie(obj,cookiename){
-	var i,str; c = new Array(); p = new Array("",""); str = document.cookie;c = str.split(";");
-	for (i = 0; i < c.length; i++) { if (c[i].indexOf(cookiename+"=") >= 0) { p = (c[i].substr(c[i].indexOf("=")+1)).split("<>"); break; }}
-	if(cookiename == "SN_UPLOAD"){ obj.pass.value =  unescape(p[0]);$postval }
-	else if(cookiename == "SN_DEL"){ obj.delpass.value =  unescape(p[0]);}
-	return true;
-}
-function delnoin(no){
-	document.Del.delno.value = no;
-	document.Del.del.focus();
-}
-//-->
-</script>
-$set{'html_css'}</HEAD>
-<body bgcolor="#ffffff" text="#000000" LINK="#6060FF" VLINK="#6060FF" ALINK="#6060FF" onload="getCookie(document.Form,'SN_UPLOAD');getCookie(document.Del,'SN_DEL');">
-<table summary="title" width="100%"><tr><td bgcolor="#caccff"><strong><font size="4" color="#3366cc">Uploader</font></strong></td></tr></table>
-<p>
-Now.. Testing..
-</p>
+	my $lastpage = int(($log - 2) / $set{'pagelog'}) + 1;
+	my $header = <<"EOM";
+$set{'html_head'}	<script src="$set{'img_dir'}upload.js" type="text/javascript"></script>
+</head>
+<body>
+
+<header id="header">
+	<h1>$set{'html_title'}</h1>
+$set{'html_desc'}
+</header><!-- /#header -->
+
+<section id="upform">
 EOM
-	my $maxsize = 'Max '.dispsize($set{'max_size'}*1024);
-	my ($minsize,$total);
-	if($set{'min_flag'}){ $minsize = 'Min '.dispsize($set{'min_size'}*1024).' - '; }
-	if($set{'max_all_flag'}){ $total .= ' Total '.dispsize($set{'max_all_size'}*1024);}
-	$header .= qq|<FORM METHOD="POST" ENCTYPE="multipart/form-data" ACTION="$set{'base_cgi'}" name="Form">FILE $minsize$maxsize (*$set{'max_log'}Files$total)<br>|;
-	$header .='<INPUT TYPE=file  SIZE="40" NAME="upfile">';
-	$header .= ' DLKey: <INPUT TYPE=text SIZE="8" NAME="dlkey" maxlength="8">' if($set{'dlkey'});
-	$header .= '
-DELKey: <INPUT TYPE=password SIZE="10" NAME="pass" maxlength="8"><br>
-COMMENT<br>
-<INPUT TYPE=text SIZE="45" NAME="comment">
-<INPUT TYPE=hidden NAME="jcode" VALUE="Š¿š">
-<INPUT TYPE=submit VALUE="Upload"><INPUT TYPE=reset VALUE="Cancel"><br>
-';
-	if($set{'post_flag'}){ $header .= 'PostKey<br><INPUT TYPE=password SIZE="10" NAME="postkey" maxlength="10">'; }
-	$header .= '</FORM>';
+	my $maxsize = 'Max '.&snup::dispsize($set{'max_size'}*1024);
+	my ($minsize, $total);
+	$minsize = $set{'min_flag'} ? 'Min '.&snup::dispsize($set{'min_size'}*1024).' - ' : '';
+	if($set{'max_all_flag'}){ $total .= ' Total '.&snup::dispsize($set{'max_all_size'}*1024);}
+	$header .= qq|\t<form method="post" enctype="multipart/form-data" action="$set{'base_cgi'}" name="Form" id="Form">|;
+	$header .= "\n\t\t<ul>\n";
+	$header .= "\t\t\t<li>ã‚¢ãƒ—ã™ã‚‹ãƒ•ã‚¡ã‚¤ãƒ«ï¼ˆ$minsize$maxsizeï¼‰";
+	if($set{'max_log_flag'}){ $header .= qq|(*$set{'max_log'}Files$total)|; }
+	$header .= "</li>\n\t\t\t<li>";
+	$header .= qq|\n\t\t\t\t<input type="file" name="upfile" id="upfile" />|;
+	$header .= qq|\n\t\t\t\tDLKey: <input type="text" size="8" maxlength="8" name="dlkey" id="dlkey" />| if($set{'dlkey'});
+	$header .= qq|\n\t\t\t\tDELKey: <input type="password" size="10" maxlength="8" name="pass" id="pass" />
+			</li>
+			<li>ã‚³ãƒ¡ãƒ³ãƒˆ</li>
+			<li>
+				<input type="text" size="45" name="comment" id="comment" />
+				<input type="hidden" value="æ¼¢å­—" name="jcode" id="jcode" />
+				<input type="submit" value="Upload" /><input type="reset" value="Cancel" />
+			</li>|;
+	if($set{'post_flag'}){
+		$header .= "\t\t<li>PostKey</li>";
+		$header .= qq|\n\t\t<li><input type="password" size="10" maxlength="10" name="postkey" id="postkey" /></li>\n|;
+	}
+	$header .= qq|
+		</ul>
+	</form>
+</section><!-- /#upform -->
+|;
 
 	my $allsize = 0;
-	my @files = globfile("$set{'src_dir'}",".*");
-	my @dir = globdir("$set{'src_dir'}",".*");
-	foreach my $dir (@dir){	push(@files,globfile($dir."/",".*")); }
+	my @files = &snup::globfile("$set{'src_dir'}", ".*");
+	my @dir = &snup::globdir("$set{'src_dir'}", ".*");
+	foreach my $dir (@dir){	push(@files,&snup::globfile($dir."/", ".*")); }
 	foreach my $value (@files){ $allsize += (-s "$value"); }
 
-	$allsize = dispsize($allsize);
+	$allsize = &snup::dispsize($allsize);
 
-	my $footer = "</table><HR size=1>Used ${allsize}\n<br>";
+	my $footer = qq|
+<footer id="footer">
+	<p>Used ${allsize}</p>
+	<p>upå¯èƒ½æ‹¡å¼µå­: |;
+
 	if($set{'up_all'} && !$set{'ext_org'}){ $footer .= $set{'up_ext'}.' +'; }
 	elsif(!$set{'up_all'}){ $footer .= $set{'up_ext'}; }
-	$footer .= "\n<table summary=\"footer\" width=\"100%\"><tr><td><div align=left><FORM METHOD=POST ACTION=\"$set{'base_cgi'}\" name=\"Del\"><span style='font-size:9pt'><input type=hidden name=mode value=delete>No.<input type=text size=4 name=delno> key<input type=password size=4 name=delpass> <input type=submit value=\"del\" name=del></span></form></div>\n";
-	$footer .= "</td><td><div align=right><!-- $set{'ver'} --><a href=\"http://sugachan.dip.jp/download/\" target=\"_blank\"><small>Sn Uploader</small></a></div></td></tr></table>\n</body>\n</html>";
+	$footer .= <<"EOM";
+</p>
+	<div style="float: left;">
+		<form method="post" action="$set{'base_cgi'}" name="Del" id="Del">
+			<span style="font-size: 9pt">
+				<input type="hidden" name="mode" value="delete" />
+				No.<input type="text" size="4" name="delno" />
+				key<input type="password" size="4" name="delpass" />
+				<input type="submit" value="del" name="del" />
+			</span>
+		</form>
+	</div>
+	<div style="float: right;">
+		<!-- $set{'ver'} -->
+		<address>
+			<a href="http://sugachan.dip.jp/download/">Sn Uploader</a>
+			<a href="http://kaz-ic.net/tools/sn-uploader-kai">kai</a>
+		</address>
+	</div>
+</footer><!-- /#footer -->
 
-	my $info_title = "<table summary=\"upinfo\" width=\"100%\">\n<tr><td></td><td>NAME</td>";
-	if($set{'disp_comment'}){ $info_title .= "<td>COMMENT</td>"; } if($set{'disp_size'}){ $info_title .= "<td>SIZE</td>"; } if($set{'disp_date'}){ $info_title .= "<td>DATE</td>"; }
-	if($set{'disp_mime'}){ $info_title .= "<td>MIME</td>"; } if($set{'disp_orgname'}){ $info_title .= "<td>ORIG</td>"; }
-	$info_title .= "</tr>\n";
+</body>
+</html>
+EOM
 
-	my $home_url_link;
-	if($set{'home_url'}){ $home_url_link = qq|<a href="$set{'home_url'}">[HOME]</a> |;}
+	my $upinfo_section_start = qq|\n<section id="upinfo">\n|;
+	my $upinfo_section_end   = qq|\n</section><!-- /#upinfo -->\n|;
+
+	my $table_header = qq|
+	<table style="width: 100%;">
+		<tr>
+			<th></th>
+			<th>NAME</th>\n|;
+	if($set{'disp_comment'}){ $table_header .= "\t\t\t<th>COMMENT</th>\n"; }
+	if($set{'disp_size'}){ $table_header .= "\t\t\t<th>SIZE</th>\n"; }
+	if($set{'disp_date'}){ $table_header .= "\t\t\t<th>DATE</th>\n"; }
+	if($set{'disp_mime'}){ $table_header .= "\t\t\t<th>MIME</th>\n"; }
+	if($set{'disp_orgname'}){ $table_header .= "\t\t\t<th>ORIG</th>\n"; }
+	if($set{'disp_thumb'}){ $table_header .= "\t\t\t<th>THUMBNAIL</th>\n"; }
+	$table_header .= "\t\t</tr>\n";
+
+	my $table_footer = "\t</table>\n";
+
+	my $home_url_link = $set{'home_url'} ? "\t\t<li><a href=\"$set{'home_url'}\">[HOME]</a></li>\n" : '';
 	if($set{'html_all'}){
-		my $buff; my $no = 1; my $time = time; my $subheader;
+		my $no = 1; my $subheader;
 		foreach my $value (@log){
-			my ($no,$ext,$date,$comment,$mime,$orgname,$addr,$host,$pass,$dummy) = split(/<>/,$value);
+			my ($no, $ext, $date, $comment, $mime, $orgname, $addr, $host, $pass, $dummy) = split(/<>/, $value);
 			if(!$dummy){ next; }
-			$buff .= makeitem($value);
+			$buff .= &snup::makeitem($value);
 		}
-		$subheader .= "[ALL] ";
+		$subheader .= "\t<hr />\n\t<ul>\n";
+		$subheader .= "\t\t<li>[ALL]</li>\n";
 		while($no <= $lastpage){
-			if($no == $page) { $subheader .= "\[$no\] ";}
-			else{	if($no == 1){ $subheader .= "<a href=\"$set{'http_html_path'}$set{'base_html'}?$time\">\[$no\]</a> "}
-					else{$subheader .= "<a href=\"$set{'http_html_path'}$no.html?$time\">\[$no\]</a> ";}	}
+			if($no == $page){ $subheader .= "<li>\[$no\]</li>\n";}
+			else{
+				if($no == 1){ $subheader .= "\t\t<li><a href=\"$set{'http_html_path'}$set{'base_html'}\">\[$no\]</a></li>\n"; }
+				else{ $subheader .= "\t\t<li><a href=\"$set{'http_html_path'}$no.html\">\[$no\]</a></li>\n"; }
+			}
 			$no++;
 		}
-		$subheader .= $info_title;
-		open(OUT,">$set{'html_dir'}all.html")||&error(306,"$set{'html_dir'}all.html");
-		print OUT $header."<hr size=1>".$home_url_link.$subheader."<hr size=1>".$buff.$footer;
+		$subheader .= "\t</ul>\n\t<hr />\n";
+
+		open(OUT, ">$set{'html_dir'}all.html") || &snup::error(306, "$set{'html_dir'}all.html");
+		print OUT $header
+			.$home_url_link
+			.$upinfo_section_start
+			.$subheader
+			.$table_header
+			.$buff
+			.$table_footer
+			.$subheader
+			.$upinfo_section_end
+			.$footer;
 		close(OUT);
-		chmod($set{'per_upfile'},"$set{'html_dir'}all.html");
+		chmod($set{'per_upfile'}, "$set{'html_dir'}all.html");
+		$buff = '';
 	}else{ unlink("$set{'html_dir'}all.html"); }
-	
+
 	while($log > $i){
-		$buff .= makeitem($log[$i]) unless($init);
-		if(($i % $set{'pagelog'}) == 0||$i == $log -1){
-			$page++; my $subheader; my $no = 1;	my $time = time;
-			if($set{'html_all'}){ $subheader .= "<a href=\"./all.html?$time\">[ALL]</a> "; }
+		$buff .= &snup::makeitem($log[$i]) unless($init);
+		if(($i % $set{'pagelog'}) == 0 || $i == $log -1){
+			$page++; my $subheader; my $no = 1;
+			$subheader .= "\t<hr />\n\t<ul>\n";
+			if($set{'html_all'}){ $subheader .= "\t\t<li><a href=\"./all.html\">[ALL]</a></li>\n"; }
 			while($no <= $lastpage){
-				if($no == $page) { $subheader .= "\[$no\] ";}
-				else{	if($no == 1){ $subheader .= "<a href=\"$set{'http_html_path'}$set{'base_html'}?$time\">\[$no\]</a> "}
-						else{$subheader .= "<a href=\"$set{'http_html_path'}$no.html?$time\">\[$no\]</a> ";}
+				if($no == $page){ $subheader .= "\t\t<li>\[$no\]</li>\n";}
+				else{	if($no == 1){ $subheader .= "\t\t<li><a href=\"$set{'http_html_path'}$set{'base_html'}\">\[$no\]</a></li>\n"}
+						else{$subheader .= "\t\t<li><a href=\"$set{'http_html_path'}$no.html\">\[$no\]</a></li>\n";}
 				}
 				$no++;
 			}
-			$subheader .= $info_title;
+			$subheader .= "\t</ul>\n\t<hr />\n";
+
 			my $loghtml;
 			if($page == 1){	$loghtml = "$set{'html_dir'}$set{'base_html'}"; }
 			else{ $loghtml = "$set{'html_dir'}$page.html"; }
 
-			open(OUT,">$loghtml") || &error(306,"$loghtml");
-			print OUT $header."<hr size=1>".$home_url_link.$subheader."<hr size=1>".$buff.$footer;
+			open(OUT, ">$loghtml") || &snup::error(306, "$loghtml");
+			print OUT $header
+				.$home_url_link
+				.$upinfo_section_start
+				.$subheader
+				.$table_header
+				.$buff
+				.$table_footer
+				.$subheader
+				.$upinfo_section_end
+				.$footer;
 			close(OUT);
-			chmod($set{'per_upfile'},$loghtml);
+			chmod($set{'per_upfile'}, $loghtml);
 			undef $buff;
 		}
 		$i++;
@@ -412,39 +585,41 @@ COMMENT<br>
 sub filewrite{
 	my $random = int(rand(900000)) + 100000;
 	if(-e "$set{'src_dir'}$random.temporary"){ $random++; }
-	if(-e "$set{'src_dir'}$random.temporary"){ &error(204); }
-	open (FILE,">$set{'src_dir'}$random.temporary") || &error(204);
+	if(-e "$set{'src_dir'}$random.temporary"){ &snup::error(204); }
+	open (FILE, ">$set{'src_dir'}$random.temporary") || &snup::error(204);
 	binmode(FILE);
 	eval{ while(my $read = read($in{'upfile'}, my $buff, 8192)){ print FILE $buff; }};
 	close(FILE);
-	chmod($set{'per_upfile'},"$set{'src_dir'}$random.temporary");
-	if((-s "$set{'src_dir'}$random.temporary") == 0){ unlink("$set{'src_dir'}$random.temporary"); &error(99); }
+	chmod($set{'per_upfile'}, "$set{'src_dir'}$random.temporary");
+	if((-s "$set{'src_dir'}$random.temporary") == 0){ unlink("$set{'src_dir'}$random.temporary"); &snup::error(99); }
 	my $size = (-s "$set{'src_dir'}$random.temporary");
-	if($set{'min_flag'} && ($size < $set{'min_size'} * 1024)){ unlink("$set{'src_dir'}$random.temporary"); &error(107,$size);}
-	if($size > $set{'max_size'} * 1024){ unlink("$set{'src_dir'}$random.temporary"); &error(106,$size);}
-	eval { close($in{'upfile'});};
+	if($set{'min_flag'} && ($size < $set{'min_size'} * 1024)){ unlink("$set{'src_dir'}$random.temporary"); &snup::error(107, $size);}
+	if($size > $set{'max_size'} * 1024){ unlink("$set{'src_dir'}$random.temporary"); &snup::error(106, $size);}
+	eval{ if(defined($in{'upfile'}) && -t $in{'upfile'}){ close($in{'upfile'}); }};
 	unlink($in{'tmpfile'});
 	return("$set{'src_dir'}$random.temporary");
 }
 
 sub delete{
 	my $mode = $_[0];
-	my @delno = split(/,/,$_[1]);
+	if(!defined($mode)){ $mode = ''; }
+	my @delno = defined($_[1]) ? split(/,/, $_[1]) : ();
 	my $delno; my $flag = 0; my $tmpaddr;
 	my $delnote;
+	my $deleted_list = '';
 
 	if($in{'delno'} =~ /(\d+)/){ $delno = $1; }
 	if($mode ne 'admin' && !$in{'delno'}){ return; }
-	elsif($mode ne 'admin' && !$delno){ &error(401,$in{'delno'}); }
+	elsif($mode ne 'admin' && !$delno){ &snup::error(401, $in{'delno'}); }
 
-	open(IN,$set{'log_file'})|| &error(303);
+	open(IN, $set{'log_file'}) || &snup::error(303);
 	my @log = <IN>;
 	close(IN);
 
 	if($in{'addr'} =~ /(\d+).(\d+).(\d+).(\d+)/){ $tmpaddr = "$1.$2.$3."; }
 	my $findflag = 0;
 	foreach my $value (@log){
-		my ($no,$ext,$date,$comment,$mime,$orgname,$addr,$host,$pass,$filepre,$note,$dummy) = split(/<>/,$value);
+		my ($no, $ext, $date, $comment, $mime, $orgname, $addr, $host, $pass, $filepre, $note, $dummy) = split(/<>/, $value);
 		$delnote = $note;
 		my $delflag = 0;
 		if(!$addr){ next; }
@@ -453,23 +628,23 @@ sub delete{
 		}elsif($no == $delno){
 			$findflag = 1;
 			unless ($addr =~ /^$tmpaddr/){
-				my ($pass,$id) = split(/,/,$pass);
+				my ($pass, $id) = split(/,/, $pass);
 				my $delpass = $in{'delpass'} || $in{'addr'}.time();
-				my $salt = substr($pass, 0, 2);	$delpass = crypt($delpass,$salt);
-				my $usersalt = substr($in{'user'},0,2); my $userid = crypt($in{'user'},$usersalt);
-				if ($in{'delpass'} ne $set{'admin_pass'} && $delpass ne $pass && $userid ne $id){ 
-					if($mode ne 'admin'){ if(!$dummy){ $filepre = $set{'file_pre'};} $no = sprintf("%04d",$no); &error(404,"$filepre$no.$ext");}
+				my $salt = substr($pass, 0, 2);	$delpass = crypt($delpass, $salt);
+				my $usersalt = substr($in{'user'}, 0, 2); my $userid = crypt($in{'user'}, $usersalt);
+				if ($in{'delpass'} ne $set{'admin_pass'} && $delpass ne $pass && $userid ne $id){
+					if($mode ne 'admin'){ if(!$dummy){ $filepre = $set{'file_pre'};} $no = sprintf("%04d", $no); &snup::error(404, "$filepre$no.$ext");}
 				}
 			}
 			$delflag = 1;
 		}
 		if($delflag){
-#			open(OUT,">>./del.cgi"); print OUT $value; close(OUT);
+#			open(OUT, ">>./del.cgi"); print OUT $value; close(OUT);
 			$flag = 1;
 			if(!$dummy){ $filepre = $set{'file_pre'};}
-			$no = sprintf("%04d",$no);
+			$no = sprintf("%04d", $no);
 			my $filename;
-			my ($dlpath,$filedir);
+			my ($dlpath, $filedir);
 			if($delnote =~ /DLpath:(.+)\s/){
 				$dlpath = $1;
 				$filename = "$set{'src_dir'}$filepre$no.${ext}_$dlpath/$filepre$no.$ext";
@@ -477,59 +652,76 @@ sub delete{
 			}else{
 				$filename = "$set{'src_dir'}$filepre$no.$ext";
 			}
-			
+
 			if(unlink($filename)){
-				unlink("$set{'src_dir'}$filepre$no.$ext.html"); if($filedir){ foreach(globfile($filedir,".*")){ unlink; } rmdir($filedir);} undef $value;
+				unlink("$set{'src_dir'}$filepre$no.$ext.html"); if($filedir){ foreach(&snup::globfile($filedir, ".*")){ unlink; } rmdir($filedir);} $value = '';
 			}elsif(unlink($filename)){
-				unlink("$set{'src_dir'}$filepre$no.$ext.html"); if($filedir){ foreach(globfile($filedir,".*")){ unlink; } rmdir($filedir);} undef $value;
+				unlink("$set{'src_dir'}$filepre$no.$ext.html"); if($filedir){ foreach(&snup::globfile($filedir, ".*")){ unlink; } rmdir($filedir);} $value = '';
 			}elsif(!(-e $filename)){
-				unlink("$set{'src_dir'}$filepre$no.$ext.html"); if($filedir){ foreach(globfile($filedir,".*")){ unlink; } rmdir($filedir);} undef $value;
+				unlink("$set{'src_dir'}$filepre$no.$ext.html"); if($filedir){ foreach(&snup::globfile($filedir, ".*")){ unlink; } rmdir($filedir);} $value = '';
 			}else{
-				if($mode ne 'admin'){ &error(403,"$filepre$no.$ext");}
+				if($mode ne 'admin'){ &snup::error(403, "$filepre$no.$ext");}
 			}
+			$deleted_list .= " $filepre$no.$ext";
 		}
 	}
-	if($mode ne 'admin' && !$findflag){ &error(402,$delno); }
+	if($mode ne 'admin' && !$findflag){ &snup::error(402, $delno); }
 	if($flag){
-		logwrite(@log);
-		&makehtml();
+		my $notification_body = <<"EOM";
+DELETED:$deleted_list
+DELETED_DATE: $in{'date'}
+REMOTE_ADDR: $in{'addr'}
+REMOTE_HOST: $in{'host'}
+EOM
+		&snup::send_notification('File deleted', $notification_body);
+		&snup::logwrite(@log);
+		&snup::makehtml();
 	}
 }
 
 sub quit{
-	my ($cookiename,$buff);
+	my ($cookiename, $buff);
 	my $flag = 0;
-	my @tmpfiles = globfile("$set{'src_dir'}","\.temporary");
+	my @tmpfiles = &snup::globfile("$set{'src_dir'}", "\.temporary");
 	foreach my $value (@tmpfiles){ if((stat($value))[10] < time - 60*60){ unlink("$value"); $flag++; } }
-	&makehtml() if($flag);
-	$buff =<<"EOM";
-$set{'html_head'}<META HTTP-EQUIV="Refresh" CONTENT="1;URL=$set{'http_html_path'}$set{'base_html'}">
+	&snup::makehtml() if($flag);
+	$buff = <<"EOM";
+$set{'html_head'}	<script type="text/javascript"><!--
+		setTimeout(function(){ location.href = "$set{'http_html_path'}$set{'base_html'}?$in{'time'}" }, 1000);
+	--></script>
 EOM
 	if($in{'jcode'} || $in{'mode'} eq 'delete'){
-		$buff .=<<"EOM";
-<META HTTP-EQUIV="Set-Cookie" content="SN_USER=$in{'user'}&lt;&gt;1; path=/; expires=Tue, 31-Dec-2030 23:59:59 GMT">
-<META HTTP-EQUIV="CONTENT-SCRIPT-TYPE" CONTENT="text/javascript">
-<script type="text/javascript">
-<!--
-setCookie();
-function setCookie() {
-	var key1,key2;
-	var tmp = "path=/; expires=Tue, 31-Dec-2030 23:59:59; ";
+		$buff .= <<"EOM";
+	<meta http-equiv="Set-Cookie" content="SN_USER=$in{'user'}&lt;&gt;1; path=/; expires=Tue, 31-Dec-2030 23:59:59 GMT">
+	<script type="text/javascript"><!--
+		setCookie();
+		function setCookie(){
+			var key1,key2;
+			var tmp = "path=/; expires=Tue, 31-Dec-2030 23:59:59; ";
 EOM
 		if($in{'jcode'}){
-			my %ck; foreach(split(/;/,$ENV{'HTTP_COOKIE'})){ my($key,$val) = split(/=/); $key =~ s/\s//g; $ck{$key} = $val;}
-			my @ck = split(/<>/,$ck{'SN_DEL'});
-			if(!$ck[0] && $in{'org_pass'}){	$buff .= qq|\tdocument.cookie = "SN_DEL="+escape('$in{'org_pass'}')+"<>;"+ tmp;\n|;}
-			$cookiename = 'SN_UPLOAD'; $buff .= "\tkey1 = escape('$in{'org_pass'}'); key2 = escape('$in{'postkey'}');\n";}
-		else{ $cookiename = 'SN_DEL'; $buff .= "\tkey1 = escape('$in{'delpass'}'); key2 = '';\n"; }
-		$buff .= qq|\tdocument.cookie = "$cookiename="+key1+"<>"+key2+"; "+ tmp;\n}\n//-->\n</script>\n|;
+			my(%ck, @ck);
+			if(defined($ENV{'HTTP_COOKIE'})){
+				foreach(split(/;/, $ENV{'HTTP_COOKIE'})){ my($key, $val) = split(/=/); $key =~ s/\s//g; $ck{$key} = $val;}
+				@ck = split(/<>/, $ck{'SN_DEL'});
+			}else{ @ck = (); }
+			if(!$ck[0] && $in{'org_pass'}){ $buff .= qq|\t\t\tdocument.cookie = "SN_DEL="+escape('$in{'org_pass'}')+"<>;"+ tmp;\n|; }
+			$cookiename = 'SN_UPLOAD'; $buff .= "\t\t\tkey1 = escape('$in{'org_pass'}'); key2 = escape('$in{'postkey'}');\n";}
+		else{ $cookiename = 'SN_DEL'; $buff .= "\t\t\tkey1 = escape('$in{'delpass'}'); key2 = '';\n"; }
+		$buff .= qq|\t\t\tdocument.cookie = "$cookiename=" +key1 +"<>" +key2 +"; " +tmp;\n\t\t}\n\t--></script>\n|;
 	}
-	$buff .=<<"EOM";
+	$buff .= <<"EOM";
+</head>
 <body>
-<br><br><div align=center><font size="+1"><br><br>
-<a href="$set{'http_html_path'}$set{'base_html'}?$in{'time'}">click here!</a></font><br>
+
+<div id="wrapper">
+	<section id="content">
+		<a href="$set{'http_html_path'}$set{'base_html'}?$in{'time'}" style="font-size: 20px;">click here!</a>
+	</section><!-- /#content -->
 </div>
-</body></html>
+
+</body>
+</html>
 EOM
 	print "Content-type: text/html\n\n";
 	print $buff;
@@ -537,82 +729,183 @@ EOM
 }
 
 sub admin_mode{
-	&errorclear() if($in{'mode'} eq 'errorclear');
-	&delete('admin',$in{'admin_delno'}) if($in{'mode'} eq 'delete');
+	&snup::errorclear() if($in{'mode'} eq 'errorclear');
+	&snup::delete('admin', $in{'admin_delno'}) if($in{'mode'} eq 'delete');
 
-	open(IN,$set{'log_file'})||error(303);
+	open(IN, $set{'log_file'}) || &snup::error(303);
 	my @log = <IN>;
 	close(IN);
 
-	my ($header,$buff,$footer,$value);
-	$buff =<<"EOM";
-$set{'html_head'}$set{'html_css'}</HEAD>
-<body bgcolor="#ffffff" text="#000000" LINK="#6060FF" VLINK="#6060FF" ALINK="#6060FF">
+	my ($header, $buff, $footer, $value);
+	$buff = <<"EOM";
+$set{'html_head'}</head>
+<body>
+
+<header id="header">
+	<h1>Admin</h1>
+	<form action="$set{'base_cgi'}" method="post">
+		<input type="hidden" name="delpass" value="$set{'admin_pass'}" />
+		<input type="submit" value="HTMLã‚’æ›´æ–°ã™ã‚‹/ãƒ­ã‚°ã‚¢ã‚¦ãƒˆ" />
+	</form>
+</header><!-- /#header -->
+
+<section id="content">
 EOM
 
-	$buff .= leaddisp(0,1,1).'<a name="up"></a><table summary="title" width="100%"><tr><td bgcolor="#caccff"><strong><font size="4" color="#3366cc">Upload Info</font></strong></td></tr></table>';
-	$buff .= qq|<table summary="check"><tr><td><form action="$set{'base_cgi'}" method="POST"><input type=hidden name="checkmode" value="allcheck"><input type=hidden name=delno value="$in{'delno'}"><input type=hidden name=delpass value="$in{'delpass'}"><input type=submit value="‚·‚×‚Äƒ`ƒFƒbƒN"></form></td><td><form action="$set{'base_cgi'}" method="POST"><input type=hidden name="checkmode" value="nocheck"><input type=hidden name=delno value="$in{'delno'}"><input type=hidden name=delpass value="$in{'delpass'}"><input type=submit value="‚·‚×‚ÄŠO‚·"></form></td><td><form action="$set{'base_cgi'}" method="POST"><input type=hidden name=delpass value="$set{'admin_pass'}"><input type=submit value="HTML‚ğXV‚·‚é/ƒƒOƒAƒEƒg"></form></td></tr></table>\n<form action="$set{'base_cgi'}" method="POST"><input type=hidden name="mode" value="delete"><input type=hidden name=delno value="$in{'delno'}"><input type=hidden name=delpass value="$in{'delpass'}"><input type=submit value="ƒ`ƒFƒbƒN‚µ‚½‚à‚Ì‚ğíœ"><br>\n|."<table summary=\"upinfo\" width=\"100%\">\n<tr><td>DEL</td><td>NAME</td><td>COMMENT</td><td>SIZE</td><td>ADDR</td><td>HOST</td><td>DATE</td><td>NOTE</td><td>MIME</td><td>ORIG</td></tr>\n";
+	$buff .= qq|\t<section id="up">\n|;
+	$buff .= &snup::leaddisp(0, 1, 1);
+	$buff .= qq|\t\t<h2>Upload Info</h2>\n|;
+	$buff .= <<"EOM";
+		<table>
+			<tr>
+				<td>
+					<form action="$set{'base_cgi'}" method="post">
+						<input type="hidden" name="checkmode" value="allcheck" />
+						<input type="hidden" name="delno" value="$in{'delno'}" />
+						<input type="hidden" name="delpass" value="$in{'delpass'}" />
+						<input type="submit" value="ã™ã¹ã¦ãƒã‚§ãƒƒã‚¯" />
+					</form>
+				</td>
+				<td>
+					<form action="$set{'base_cgi'}" method="post">
+						<input type="hidden" name="checkmode" value="nocheck" />
+						<input type="hidden" name="delno" value="$in{'delno'}" />
+						<input type="hidden" name="delpass" value="$in{'delpass'}" />
+						<input type="submit" value="ã™ã¹ã¦å¤–ã™" />
+					</form>
+				</td>
+			</tr>
+		</table>
+		<form action="$set{'base_cgi'}" method="post">
+			<table style="width: 100%;">
+				<tr>
+					<th>DEL</th>
+					<th>NAME</th>
+					<th>COMMENT</th>
+					<th>SIZE</th>
+					<th>ADDR</th>
+					<th>HOST</th>
+					<th>DATE</th>
+					<th>NOTE</th>
+					<th>MIME</th>
+					<th>ORIG</th>
+					<th>THUMBNAIL</th>
+				</tr>
+EOM
 	shift(@log);
-	foreach (@log){	$buff .= makeitem($_,'admin'); }
-	$buff .= '</table></form><br><br>';
+	foreach (@log){	$buff .= &snup::makeitem($_, 'admin'); }
+	$buff .= <<"EOM";
+			</table>
+			<input type="hidden" name="mode" value="delete" />
+			<input type="hidden" name="delno" value="$in{'delno'}" />
+			<input type="hidden" name="delpass" value="$in{'delpass'}" />
+			<input type="submit" value="ãƒã‚§ãƒƒã‚¯ã—ãŸã‚‚ã®ã‚’å‰Šé™¤" />
+		</form>
+	</section>
+EOM
 
 	if($set{'error_level'}){
-		$buff .= leaddisp(-1,0,1).'<a name="error"></a><table summary="errortitle" width="100%"><tr><td bgcolor="#caccff"><strong><font size="4" color="#3366cc">Error Info</font></strong></td></tr></table>';
-		$buff .= qq|<form action="$set{'base_cgi'}" method="POST"><input type=hidden name=mode value="errorclear"><input type=hidden name=delno value="$in{'delno'}"><input type=hidden name=delpass value="$in{'delpass'}"><input type=submit value="ƒGƒ‰[ƒƒOƒNƒŠƒA"></form>|;
-		$buff .= "<table summary=\"errorinfo\" width=\"100%\">\n<tr><td>DATE</td><td>ADDR</td><td>HOST</td><td>NOTE</td></tr>\n";
-		if(open(IN,$set{'error_log'})){	@log = reverse(<IN>); close(IN); foreach (@log){ my ($date,$no,$note,$addr,$host) = split(/<>/); $buff .= "<tr><td>$date</td><td>$addr</td><td>$host</td><td>$note</td></tr>\n"; }}
-		$buff .= "</table><br><br>\n";
+		$buff .= qq|\t<section id="error">\n|;
+		$buff .= &snup::leaddisp(-1, 0, 1);
+		$buff .= qq|\t\t<h2>Error Info</h2>\n|;
+		$buff .= <<"EOM";
+		<form action="$set{'base_cgi'}" method="post">
+			<input type="hidden" name="mode" value="errorclear" />
+			<input type="hidden" name="delno" value="$in{'delno'}" />
+			<input type="hidden" name="delpass" value="$in{'delpass'}" />
+			<input type="submit" value="ã‚¨ãƒ©ãƒ¼ãƒ­ã‚°ã‚¯ãƒªã‚¢" />
+		</form>
+EOM
+		$buff .= <<"EOM";
+		<table style="width: 100%;">
+			<tr>
+				<th>DATE</th>
+				<th>ADDR</th>
+				<th>HOST</th>
+				<th>NOTE</th>
+			</tr>
+EOM
+		if(open(IN, $set{'error_log'})){
+			@log = reverse(<IN>);
+			close(IN);
+			foreach (@log){
+				my ($date, $no, $note, $addr, $host) = split(/<>/);
+				$buff .= <<"EOM";
+			<tr>
+				<td>$date</td>
+				<td>$addr</td>
+				<td>$host</td>
+				<td>$note</td>
+			</tr>
+EOM
+			}
+		}
+		$buff .= "\t\t</table>\n";
+		$buff .= "\t</section>\n";
 	}
 
-	$buff .= leaddisp(-1,-1,0);
-	$buff .= '<a name="set"></a><table summary="settitle" width="100%"><tr><td bgcolor="#caccff"><strong><font size="4" color="#3366cc">Setting Info</font></strong></td></tr></table>'."\n<table summary=\"setting\">\n";
-	$buff .= tablestr('ƒXƒNƒŠƒvƒgVer',$set{'ver'});
-	$buff .= tablestr('ƒƒCƒ“ƒƒOƒtƒ@ƒCƒ‹',$set{'log_file'});
+	$buff .= qq|\t<section id="set">\n|;
+	$buff .= &snup::leaddisp(-1,-1, 0);
+	$buff .= qq|\t\t<h2>Setting Info</h2>\n|;
+	$buff .= "\t\t<table>\n";
+
+	$buff .= &snup::tablestr('ã‚¹ã‚¯ãƒªãƒ—ãƒˆVer', $set{'ver'});
+	$buff .= &snup::tablestr('ãƒ¡ã‚¤ãƒ³ãƒ­ã‚°ãƒ•ã‚¡ã‚¤ãƒ«', $set{'log_file'});
 	if($set{'error_level'}){
-		$buff .= tablestr('ƒGƒ‰[ƒƒOƒtƒ@ƒCƒ‹',$set{'error_log'});
-		if($set{'error_size'}){ $buff .= tablestr('ƒGƒ‰[ƒƒOÅ‘å—e—Ê',dispsize($set{'error_size'}*1024).' '.($set{'error_size'}*1024).'Bytes'); }
-		else{ $buff .= tablestr('ƒGƒ‰[ƒƒOÅ‘å—e—Ê§ŒÀ','–³'); }
-	}else{ $buff .= tablestr('ƒGƒ‰[ƒƒO‹L˜^','–³'); }
-	$buff .= tablestr('•ÛŒ”',$set{'max_log'});
-	$buff .= tablestr('Å‘å“Še—e—Ê',dispsize($set{'max_size'}*1024).' '.($set{'max_size'}*1024).'Bytes');
+		$buff .= &snup::tablestr('ã‚¨ãƒ©ãƒ¼ãƒ­ã‚°ãƒ•ã‚¡ã‚¤ãƒ«', $set{'error_log'});
+		if($set{'error_size'}){ $buff .= &snup::tablestr('ã‚¨ãƒ©ãƒ¼ãƒ­ã‚°æœ€å¤§å®¹é‡',&snup::dispsize($set{'error_size'}*1024).' '.($set{'error_size'}*1024).'Bytes'); }
+		else{ $buff .= &snup::tablestr('ã‚¨ãƒ©ãƒ¼ãƒ­ã‚°æœ€å¤§å®¹é‡åˆ¶é™', 'ç„¡'); }
+	}else{ $buff .= &snup::tablestr('ã‚¨ãƒ©ãƒ¼ãƒ­ã‚°è¨˜éŒ²', 'ç„¡'); }
+	if($set{'max_log_flag'}){ $buff .= &snup::tablestr('ä¿æŒä»¶æ•°åˆ¶é™', $set{'max_log'}); }
+	else{ $buff .= &snup::tablestr('ä¿æŒä»¶æ•°åˆ¶é™', 'ç„¡'); }
+	$buff .= &snup::tablestr('æœ€å¤§æŠ•ç¨¿å®¹é‡',&snup::dispsize($set{'max_size'}*1024).' '.($set{'max_size'}*1024).'Bytes');
 
-	if($set{'min_flag'}){ $buff .= tablestr('Å¬§ŒÀ—e—Ê',dispsize($set{'min_size'}*1024).' '.($set{'min_size'}*1024).'Bytes'); }
-	else{ $buff .= tablestr('Å¬§ŒÀ—e—Ê',"–³"); }
-	if($set{'max_all_flag'}){ $buff .= tablestr('‘—e—Ê§ŒÀ',dispsize($set{'max_all_size'}*1024).' '.($set{'max_all_size'}*1024).'Bytes'); }
-	else{ $buff .= tablestr('‘—e—Ê§ŒÀ',"–³"); }
+	if($set{'min_flag'}){ $buff .= &snup::tablestr('æœ€å°åˆ¶é™å®¹é‡',&snup::dispsize($set{'min_size'}*1024).' '.($set{'min_size'}*1024).'Bytes'); }
+	else{ $buff .= &snup::tablestr('æœ€å°åˆ¶é™å®¹é‡', 'ç„¡'); }
+	if($set{'max_all_flag'}){ $buff .= &snup::tablestr('ç·å®¹é‡åˆ¶é™',&snup::dispsize($set{'max_all_size'}*1024).' '.($set{'max_all_size'}*1024).'Bytes'); }
+	else{ $buff .= &snup::tablestr('ç·å®¹é‡åˆ¶é™', 'ç„¡'); }
 
-	$buff .= tablestr("ƒtƒ@ƒCƒ‹Ú“ª«",$set{'file_pre'});
-	$buff .= tablestr("HTML•Û‘¶ƒfƒBƒŒƒNƒgƒŠ",$set{'html_dir'});
-	$buff .= tablestr("ƒtƒ@ƒCƒ‹•Û‘¶ƒfƒBƒŒƒNƒgƒŠ",$set{'src_dir'});
+	$buff .= &snup::tablestr('ãƒ•ã‚¡ã‚¤ãƒ«æ¥é ­è¾', $set{'file_pre'});
+	$buff .= &snup::tablestr('HTMLä¿å­˜ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒª', $set{'html_dir'});
+	$buff .= &snup::tablestr('ãƒ•ã‚¡ã‚¤ãƒ«ä¿å­˜ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒª', $set{'src_dir'});
 	if($set{'http_html_path'} && $set{'html_dir'} ne $set{'http_html_path'}){ $buff .= "<tr><td>HTTP_HTML_PATH</td><td>$set{'http_html_path'}</td></tr>\n";}
 	if($set{'http_src_path'} && $set{'src_dir'} ne $set{'http_src_path'}){ $buff .= "<tr><td>HTTP_SRC_PATH</td><td>$set{'http_src_path'}</td></tr>\n";}
-	$buff .= tablestr('1ƒy[ƒW‚É•\¦‚·‚éƒtƒ@ƒCƒ‹”',$set{'pagelog'});
-	if($set{'interval'} > 0){ $value = $set{'interval'}.'•b'; }else{ $value = '–³'; }
-	$buff .= tablestr('“¯ˆêIP“ŠeŠÔŠu•b”§ŒÀ',$value);
-	if($set{'up_ext'}){	$set{'up_ext'} =~ s/,/ /g; $buff .= tablestr('“Še‰Â”\Šî–{Šg’£q',$set{'up_ext'}); }
-	if($set{'deny_ext'}){ $set{'deny_ext'} =~ s/,/ /g; $buff .= tablestr('“Še‹Ö~Šg’£q',$set{'deny_ext'}); }
-	if($set{'change_ext'}){	$set{'change_ext'} =~ s/,/ /g; $set{'change_ext'} =~ s/>/&gt;/g; $buff .= tablestr('Šg’£q•ÏŠ·',$set{'change_ext'});	}
+	$buff .= &snup::tablestr('1ãƒšãƒ¼ã‚¸ã«è¡¨ç¤ºã™ã‚‹ãƒ•ã‚¡ã‚¤ãƒ«æ•°', $set{'pagelog'});
+	if($set{'interval'} > 0){ $value = $set{'interval'}.'ç§’'; }else{ $value = 'ç„¡'; }
+	$buff .= &snup::tablestr('åŒä¸€IPæŠ•ç¨¿é–“éš”ç§’æ•°åˆ¶é™', $value);
+	if($set{'up_ext'}){	$set{'up_ext'} =~ s/,/ /g; $buff .= &snup::tablestr('æŠ•ç¨¿å¯èƒ½åŸºæœ¬æ‹¡å¼µå­', $set{'up_ext'}); }
+	if($set{'deny_ext'}){ $set{'deny_ext'} =~ s/,/ /g; $buff .= &snup::tablestr('æŠ•ç¨¿ç¦æ­¢æ‹¡å¼µå­', $set{'deny_ext'}); }
+	if($set{'change_ext'}){	$set{'change_ext'} =~ s/,/ /g; $set{'change_ext'} =~ s/>/&gt;/g; $buff .= &snup::tablestr('æ‹¡å¼µå­å¤‰æ›', $set{'change_ext'});	}
 
-	if($set{'up_all'}){	$buff .= tablestr('w’èŠOŠg’£qƒAƒbƒvƒ[ƒh‹–‰Â','—L'); if($set{'ext_org'}){ $buff .= tablestr('w’èŠOƒtƒ@ƒCƒ‹Šg’£q','ƒIƒŠƒWƒiƒ‹'); }else{ $buff .= tablestr('w’èŠOƒtƒ@ƒCƒ‹Šg’£q','bin'); }}
-	else{$buff .= tablestr('w’èŠOŠg’£qƒAƒbƒvƒ[ƒh‹–‰Â','–³');}
+	if($set{'up_all'}){	$buff .= &snup::tablestr('æŒ‡å®šå¤–æ‹¡å¼µå­ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰è¨±å¯', 'æœ‰'); if($set{'ext_org'}){ $buff .= &snup::tablestr('æŒ‡å®šå¤–ãƒ•ã‚¡ã‚¤ãƒ«æ‹¡å¼µå­', 'ã‚ªãƒªã‚¸ãƒŠãƒ«'); }else{ $buff .= &snup::tablestr('æŒ‡å®šå¤–ãƒ•ã‚¡ã‚¤ãƒ«æ‹¡å¼µå­', 'bin'); }}
+	else{$buff .= &snup::tablestr('æŒ‡å®šå¤–æ‹¡å¼µå­ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰è¨±å¯', 'ç„¡');}
 
-	if($set{'find_crypt'}){ $value = '—L'; }else{ $value = '–³';}
-	$buff .= tablestr('ˆÃ†‰»ƒA[ƒJƒCƒuŒŸo(ZIP)',$value);
-	if($set{'binary_compare'}){ $value = '—L'; }else{ $value = '–³';}
-	$buff .= tablestr('ƒoƒCƒiƒŠ”äŠr',$value);
-	if($set{'post_flag'}){ $value = '—L'; }else{ $value = '–³';}
-	$buff .= tablestr('PostKey“Še§ŒÀ',$value);
-	if($set{'dlkey'}){ if($set{'dlkey'} == 2){$value = '•K{'}else{$value = '”CˆÓ';}}else{ $value = '–³';}
-	$buff .= tablestr('DLkey',$value);
-	if($set{'dummy_html'}){ if($set{'dummy_html'} == 3){$value = 'ALL'}elsif($set{'dummy_html'} == 2){$value = 'DLKey‚Ì‚İ';}else{$value = '’Êíƒtƒ@ƒCƒ‹‚Ì‚İ';}}else{ $value = '–³';}
-	$buff .= tablestr('ŒÂ•ÊHTMLƒLƒƒƒbƒVƒ…',$value);
-	if($set{'disp_error'}){ $value = '—L'; }else{ $value = '–³';}
-	$buff .= tablestr('ƒ†[ƒUƒGƒ‰[•\¦',$value);
-	if($set{'zero_clear'}){ $value = '—L'; }else{ $value = '–³';}
-	$buff .= tablestr('íœÏƒtƒ@ƒCƒ‹ƒŠƒXƒg©“®Á‹',$value);
-	if($set{'home_url'}){ $buff .= "<tr><td>HOMEURL</td><td>$set{'home_url'}</td></tr>\n";}
+	if($set{'find_crypt'}){ $value = 'æœ‰'; }else{ $value = 'ç„¡';}
+	$buff .= &snup::tablestr('æš—å·åŒ–ã‚¢ãƒ¼ã‚«ã‚¤ãƒ–æ¤œå‡º(ZIP)', $value);
+	if($set{'binary_compare'}){ $value = 'æœ‰'; }else{ $value = 'ç„¡';}
+	$buff .= &snup::tablestr('ãƒã‚¤ãƒŠãƒªæ¯”è¼ƒ', $value);
+	if($set{'post_flag'}){ $value = 'æœ‰'; }else{ $value = 'ç„¡';}
+	$buff .= &snup::tablestr('PostKeyæŠ•ç¨¿åˆ¶é™', $value);
+	if($set{'dlkey'}){ if($set{'dlkey'} == 2){$value = 'å¿…é ˆ'}else{$value = 'ä»»æ„';}}else{ $value = 'ç„¡';}
+	$buff .= &snup::tablestr('DLkey', $value);
+	if($set{'dummy_html'}){ if($set{'dummy_html'} == 3){$value = 'ALL'}elsif($set{'dummy_html'} == 2){$value = 'DLKeyã®ã¿';}else{$value = 'é€šå¸¸ãƒ•ã‚¡ã‚¤ãƒ«ã®ã¿';}}else{ $value = 'ç„¡';}
+	$buff .= &snup::tablestr('å€‹åˆ¥HTMLã‚­ãƒ£ãƒƒã‚·ãƒ¥', $value);
+	if($set{'disp_error'}){ $value = 'æœ‰'; }else{ $value = 'ç„¡';}
+	$buff .= &snup::tablestr('ãƒ¦ãƒ¼ã‚¶ã‚¨ãƒ©ãƒ¼è¡¨ç¤º', $value);
+	if($set{'zero_clear'}){ $value = 'æœ‰'; }else{ $value = 'ç„¡';}
+	$buff .= &snup::tablestr('å‰Šé™¤æ¸ˆãƒ•ã‚¡ã‚¤ãƒ«ãƒªã‚¹ãƒˆè‡ªå‹•æ¶ˆå»', $value);
+	if($set{'home_url'}){ $buff .= <<"EOM";
+			<tr>
+				<td>HOMEURL</td>
+				<td>$set{'home_url'}</td>
+			</tr>
+EOM
+	}
 
-	$buff .= '</table></body></html>';
+	$buff .= "\t\t</table>\n";
+	$buff .= "\t</section>\n";
+
+	$buff .= "</section><!-- /#content -->\n\n</body>\n</html>";
 
 	print "Content-type: text/html\n\n";
 	print $buff;
@@ -620,13 +913,13 @@ EOM
 }
 
 sub extfind{
-	my $orgname = @_[0];
-	my @filename = split(/\./,$orgname);
+	my $orgname = $_[0];
+	my @filename = split(/\./, $orgname);
 	my $ext = $filename[$#filename];
 	$ext =~ tr/[A-Z]/[a-z]/;
-	foreach my $value (split(/,/,$set{'change_ext'})){ my ($src,$dst) = split(/->/,$value); if($ext eq $src){ $ext = $dst; last; }}
-	foreach my $value (split(/,/,$set{'deny_ext'})){ if($ext eq $value){ &error(206,$ext); }}
-	foreach my $value (split(/,/,$set{'up_ext'})){ if ($ext eq $value) { return $value; } }
+	foreach my $value (split(/,/, $set{'change_ext'})){ my ($src, $dst) = split(/->/, $value); if($ext eq $src){ $ext = $dst; last; }}
+	foreach my $value (split(/,/, $set{'deny_ext'})){ if($ext eq $value){ &snup::error(206, $ext); }}
+	foreach my $value (split(/,/, $set{'up_ext'})){ if ($ext eq $value){ return $value; } }
 	if(length($ext) >= 5 || length($ext) == 0){ $ext = 'bin'; }
 	unless ($ext =~ /^[A-Za-z0-9]+$/){ $ext = 'bin'; }
 	if($set{'up_all'} && $set{'ext_org'}){ return $ext;}
@@ -637,61 +930,99 @@ sub extfind{
 sub conv_date{
 	my @date = gmtime($_[0] + 9*60*60);
 	$date[5] -= 100; $date[4]++;
-	if ($date[5] < 10) { $date[5] = "0$date[5]" ; }	if ($date[4] < 10) { $date[4] = "0$date[4]" ; }
-	if ($date[3] < 10) { $date[3] = "0$date[3]" ; }	if ($date[2] < 10) { $date[2] = "0$date[2]" ; }
-	if ($date[1] < 10) { $date[1] = "0$date[1]" ; }	if ($date[0] < 10) { $date[0] = "0$date[0]" ; }
-	my @w = ('Sun','Mon','Tue','Wed','Thu','Fri','Sat');
-	return ("$date[5]/$date[4]/$date[3]($w[$date[6]]),$date[2]:$date[1]:$date[0]");
+	if ($date[5] < 10){ $date[5] = "0$date[5]" ; }	if ($date[4] < 10){ $date[4] = "0$date[4]" ; }
+	if ($date[3] < 10){ $date[3] = "0$date[3]" ; }	if ($date[2] < 10){ $date[2] = "0$date[2]" ; }
+	if ($date[1] < 10){ $date[1] = "0$date[1]" ; }	if ($date[0] < 10){ $date[0] = "0$date[0]" ; }
+	my @w = ('Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat');
+	return ("$date[5]/$date[4]/$date[3]($w[$date[6]]), $date[2]:$date[1]:$date[0]");
 }
 
 sub dispsize{
 	my $size = $_[0];
 	if($size >= 1024*1024*1024*100){ $size = int($size/1024/1024/1024).'GB';}
-	elsif($size >= 1024*1024*1024*10){ $size = sprintf("%.1fGB",$size/1024/1024/1024);}
-	elsif($size > 1024*1024*1024){ $size = sprintf("%.2fGB",$size/1024/1024/1024);}
+	elsif($size >= 1024*1024*1024*10){ $size = sprintf("%.1fGB", $size/1024/1024/1024);}
+	elsif($size > 1024*1024*1024){ $size = sprintf("%.2fGB", $size/1024/1024/1024);}
 	elsif($size >= 1024*1024*100){ $size = int($size/1024/1024).'MB'; }
-	elsif($size > 1024*1024){ $size =  sprintf("%.1fMB",$size/1024/1024); }
+	elsif($size > 1024*1024){ $size =  sprintf("%.1fMB", $size/1024/1024); }
 	elsif($size > 1024){ $size = int($size/1024).'KB'; }
 	else{ $size = int($size).'B';}
 	return $size;
 }
 
 sub makeitem{
-	my ($src,$mode) = @_; my ($buff,$check,$target);
-	my ($no,$ext,$date,$comment,$mime,$orgname,$addr,$host,$pass,$filepre,$note,$dummy) = split(/<>/,$src);
+	my ($src, $mode) = @_;
+	if(!defined($mode)){ $mode = ''; }
+	my ($buff, $check, $target);
+	my ($no, $ext, $date, $comment, $mime, $orgname, $addr, $host, $pass, $filepre, $note, $dummy) = split(/<>/, $src);
 	if(!$dummy){ $filepre = $set{'file_pre'}; }
 	my $orgno = $no;
-	$no = sprintf("%04d",$no);
+	$no = sprintf("%04d", $no);
 	my $size = 0;
 	my $dlpath = 0;
 
 	if($note =~ /DLpath:(.+)\s/){
 		$dlpath = $1;
-		$size = dispsize(-s "$set{'src_dir'}$filepre$no.${ext}_$dlpath/$filepre$no.$ext");
+		$size = &snup::dispsize(-s "$set{'src_dir'}$filepre$no.${ext}_$dlpath/$filepre$no.$ext");
 	}else{
-		$size = dispsize(-s "$set{'src_dir'}$filepre$no.$ext");
+		$size = &snup::dispsize(-s "$set{'src_dir'}$filepre$no.$ext");
 	}
 
 	my $path = $set{'http_src_path'} || $set{'src_dir'};
 	if($set{'link_target'}){ $target = qq| target="$set{'link_target'}"|; }
+	else{ $target = ''; }
 	if($mode eq 'admin'){
 		if($dlpath){ $path .= "$filepre$no.${ext}_$dlpath/"; }
-		if($addr eq $host){ undef $host; }
-		if($in{'checkmode'} eq 'allcheck'){$check = ' checked';}
-		$buff = "<tr><td><INPUT TYPE=checkbox NAME=\"admin_delno\" VALUE=\"$no\"$check></td><td><a href=\"$path$filepre$no.$ext\"$target>$filepre$no.$ext</a></td><td>$comment</td><td>$size</td><td>$addr</td><td>$host</td><td>$date</td><td>$note</td><td>$mime</td><td>$orgname</td></tr>\n";
+		if($addr eq $host){ $host = ''; }
+		if($in{'checkmode'} eq 'allcheck'){ $check = 'checked="checked"'; }
+		else{ $check = ''; }
+		$buff = <<"EOM";
+	<tr>
+		<td><input type="checkbox" name="admin_delno" value="$no"$check /></td>
+		<td><a href="$path$filepre$no.$ext"$target>$filepre$no.$ext</a></td>
+		<td>$comment</td>
+		<td>$size</td>
+		<td>$addr</td>
+		<td>$host</td>
+		<td>$date</td>
+		<td>$note</td>
+		<td>$mime</td>
+		<td>$orgname</td>
+		<td><img src="$set{'thumb_dir'}$filepre$no.jpg" width="100" height="100" alt="$filepre$no.${ext}ã®ã‚µãƒ ãƒã‚¤ãƒ«" /></td>
+	</tr>
+EOM
 	}else{
-		my($d_com,$d_date,$d_size,$d_mime,$d_org);
-		if($set{'disp_comment'}){ $d_com = "<td>$comment</td>"; } if($set{'disp_size'}){ $d_size = "<td>$size</td>"; } if($set{'disp_date'}){ $d_date= "<td>$date</td>"; }
-		if($set{'disp_mime'}){ $d_mime = "<td>$mime</td>"; } if($set{'disp_orgname'}){ $d_org = "<td>$orgname</td>"; }
-		if(-e "$set{'src_dir'}$filepre$no.$ext.html"){$buff = "<tr><td><SCRIPT type=\"text/javascript\" Language=\"JavaScript\"><!--\ndocument.write(\"<a href=\\\"javascript:delnoin($orgno)\\\">$set{'char_delname'}<\\/a>\");\n// --></SCRIPT></td><td><a href=\"$path$filepre$no.$ext.html\"$target>$filepre$no.$ext</a></td>$d_com$d_size$d_date$d_mime$d_org</tr>\n";}
-		elsif($dlpath){$buff = "<tr><td><SCRIPT type=\"text/javascript\" Language=\"JavaScript\"><!--\ndocument.write(\"<a href=\\\"javascript:delnoin($orgno)\\\">$set{'char_delname'}<\\/a>\");\n// --></SCRIPT></td><td><a href=\"$set{'base_cgi'}?mode=dl&file=$orgno\">$filepre$no.$ext</a></td>$d_com$d_size$d_date$d_mime$d_org</tr>\n";}
-		else{ $buff = "<tr><td><SCRIPT type=\"text/javascript\" Language=\"JavaScript\"><!--\ndocument.write(\"<a href=\\\"javascript:delnoin($orgno)\\\">$set{'char_delname'}<\\/a>\");\n// --></SCRIPT></td><td><a href=\"$path$filepre$no.$ext\"$target>$filepre$no.$ext</a></td>$d_com$d_size$d_date$d_mime$d_org</tr>\n";}
+		my($a_tag, $d_com, $d_date, $d_size, $d_mime, $d_org, $d_thumb);
+		$d_com  = $set{'disp_comment'} ? "<td>$comment</td>" : '';
+		$d_size = $set{'disp_size'}    ? "<td>$size</td>" : '';
+		$d_date = $set{'disp_date'}    ? "<td>$date</td>" : '';
+		$d_mime = $set{'disp_mime'}    ? "<td>$mime</td>" : '';
+		$d_org  = $set{'disp_orgname'} ? "<td>$orgname</td>" : '';
+		if(-e "$set{'src_dir'}$filepre$no.$ext.html"){
+			$a_tag = qq|href="$path$filepre$no.$ext.html"$target|;
+		}elsif($dlpath){
+			$a_tag = qq|href="$set{'base_cgi'}?mode=dl&amp;file=$orgno"|;
+		}else{
+			$a_tag = qq|href="$path$filepre$no.$ext"$target|;
+		}
+		$d_thumb = $set{'disp_thumb'} ? qq|<td><a $a_tag><img src="$set{'thumb_dir'}$filepre$no.jpg" width="100" height="100" alt="$filepre$no.${ext}ã®ã‚µãƒ ãƒã‚¤ãƒ«" /></a></td>| : '';
+		$buff = <<"EOM";
+		<tr>
+			<td><a href="javascript:delnoin($orgno)">$set{'char_delname'}</a></td>
+			<td><a $a_tag>$filepre$no.$ext</a></td>
+			$d_com
+			$d_size
+			$d_date
+			$d_mime
+			$d_org
+			$d_thumb
+		</tr>
+EOM
 	}
 	return $buff;
 }
 
 sub makedummyhtml{
-	my ($filename,$com,$file,$orgdlpath,$date,$mime,$orgname,$no) = @_;
+	my ($filename, $com, $file, $orgdlpath, $date, $mime, $orgname, $no) = @_;
 	my $buff;
 
 	if(!$no){
@@ -699,137 +1030,146 @@ sub makedummyhtml{
 		$buff .= qq|Download <a href="./$filename">$filename</a>|;
 		$buff .= '</body></html>';
 	}else{
-		$buff = cryptfiledl($com,$file,$orgdlpath,$date,$mime,$orgname,$no);
+		$buff = &snup::cryptfiledl($com, $file, $orgdlpath, $date, $mime, $orgname, $no);
 	}
 
-	open(OUT,">$set{'src_dir'}$filename.html")||&error(307,"$set{'src_dir'}$filename.html");
+	open(OUT, ">$set{'src_dir'}$filename.html") || &snup::error(307, "$set{'src_dir'}$filename.html");
 	print OUT $buff;
 	close(OUT);
-	chmod($set{'per_upfile'},"$set{'src_dir'}$filename.html");
+	chmod($set{'per_upfile'}, "$set{'src_dir'}$filename.html");
 	return 1;
 }
 
 sub logwrite{
 	my @log = @_;
-	open(OUT,"+>$set{'log_file'}")||&error(304);
+	open(OUT, "+>$set{'log_file'}") || &snup::error(304);
 	eval{ flock(OUT, 2);};
 	eval{ truncate(OUT, 0);};
 	seek(OUT, 0, 0);
 	print OUT @log;
 	eval{ flock(OUT, 8);};
 	close(OUT);
-	chmod($set{'per_upfile'},$set{'log_file'});
+	chmod($set{'per_upfile'}, $set{'log_file'});
 	return 1;
 }
 
 sub binarycmp{
-	my ($src,$dst) = @_;
+	my ($src, $dst) = @_;
 	return 0 if (-s $src != -s $dst);
-	open(SRC,$src)||return 0; open(DST,$dst)||return 0;
-	my ($buff,$buff2);
-	binmode(SRC); binmode(DST); seek(SRC,0,0); seek(DST,0,0); 
-	while(read(SRC,$buff,8192)){ read(DST,$buff2,8192); if($buff ne $buff2){ close(SRC); close(DST); return 0; } }
+	open(SRC, $src) || return 0; open(DST, $dst) || return 0;
+	my ($buff, $buff2);
+	binmode(SRC); binmode(DST); seek(SRC, 0, 0); seek(DST, 0, 0);
+	while(read(SRC, $buff, 8192)){ read(DST, $buff2, 8192); if($buff ne $buff2){ close(SRC); close(DST); return 0; } }
 	close(SRC); close(DST);
 	return 1;
 }
 
 sub init{
 	my $buff;
-	if(open(OUT,">$set{'log_file'}")){
+	if(open(OUT, ">$set{'log_file'}")){
 		print OUT "0<>0<>0<>1\n";
 		close(OUT);
-		chmod($set{'per_logfile'},$set{'log_file'});
+		chmod($set{'per_logfile'}, $set{'log_file'});
 	}else{
-		$buff = "<tr><td>ƒƒCƒ“ƒƒO‚Ìì¬‚É¸”s‚µ‚Ü‚µ‚½</td></tr>";
+		$buff = "<tr><td>ãƒ¡ã‚¤ãƒ³ãƒ­ã‚°ã®ä½œæˆã«å¤±æ•—ã—ã¾ã—ãŸ</td></tr>";
 	}
-	
+
 	unless (-d "$set{'src_dir'}"){
-		if(mkdir("$set{'src_dir'}",$set{'per_dir'})){
-			chmod($set{'per_dir'},"$set{'src_dir'}");
-			open(OUT,">$set{'src_dir'}index.html");
+		if(mkdir("$set{'src_dir'}", $set{'per_dir'})){
+			chmod($set{'per_dir'}, "$set{'src_dir'}");
+			open(OUT, ">$set{'src_dir'}index.html");
 			close(OUT);
-			chmod($set{'per_upfile'},"$set{'src_dir'}index.html");
+			chmod($set{'per_upfile'}, "$set{'src_dir'}index.html");
 		}else{
-			$buff .= "<tr><td>Source•Û‘¶ƒfƒBƒŒƒNƒgƒŠ‚Ìì¬‚É¸”s‚µ‚Ü‚µ‚½</td></tr>";
+			$buff .= "<tr><td>Sourceä¿å­˜ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªã®ä½œæˆã«å¤±æ•—ã—ã¾ã—ãŸ</td></tr>";
 		}
 	}
 
 	unless (-d "$set{'html_dir'}"){
-		if(mkdir("$set{'html_dir'}",$set{'per_dir'})){
-			chmod($set{'per_dir'},"$set{'html_dir'}");
+		if(mkdir("$set{'html_dir'}", $set{'per_dir'})){
+			chmod($set{'per_dir'}, "$set{'html_dir'}");
 		}else{
-			$buff .= "<tr><td>HTML•Û‘¶ƒfƒBƒŒƒNƒgƒŠ‚Ìì¬‚É¸”s‚µ‚Ü‚µ‚½</td></tr>";
+			$buff .= "<tr><td>HTMLä¿å­˜ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªã®ä½œæˆã«å¤±æ•—ã—ã¾ã—ãŸ</td></tr>";
 		}
 	}
 
 	if($buff){
-		$buff .= "<tr><td>ƒfƒBƒŒƒNƒgƒŠ‚É‘‚«‚İŒ ŒÀ‚ª‚ ‚é‚©Šm”F‚µ‚Ä‚­‚¾‚³‚¢</td></tr>";
-		&error_disp($buff,'init');
+		$buff .= "<tr><td>ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªã«æ›¸ãè¾¼ã¿æ¨©é™ãŒã‚ã‚‹ã‹ç¢ºèªã—ã¦ãã ã•ã„</td></tr>";
+		&snup::error_disp($buff, 'init');
 	}
 }
 
 sub check_postkey{
-	my $inputkey = @_[0];
-	my @key = split(/,/,$set{'post_key'});
+	my $inputkey = $_[0];
+	my @key = split(/,/, $set{'post_key'});
 	foreach my $key (@key){ if($inputkey eq $key){ return 1; } }
 	return 0;
 }
 
 sub leaddisp{
 	my @src = @_;
-	my ($str,$count);
+	my ($str, $count);
+	$str = qq|\t\t<nav class="leaddisp">\n|;
+	$str .= "\t\t\t<ul>\n";
 	foreach my $value (@src){
-		my ($mark,$name,$link); $count++;
+		my ($mark, $name, $link); $count++;
 		if($count == 1){ $name = 'Upload Info'; $link = 'up'; }
 		elsif($count == 2){ $name = 'Error Info'; $link = 'error'; next if(!$set{'error_level'}); }
 		elsif($count == 3){ $name = 'Setting Info'; $link = 'set'; }
-		if($value){ if($value > 0){ $mark = '¥'; }else{ $mark = '£'; } $str .= qq|<a href="#$link">${mark}${name}</a> |; }
-		else{ $str .= qq|[$name] |; }
+		if($value){ if($value > 0){ $mark = 'â–¼'; }else{ $mark = 'â–²'; } $str .= qq|\t\t\t\t<li><a href="#$link">${mark}${name}</a></li>\n|; }
+		else{ $str .= qq|\t\t\t\t<li>[$name]</li>\n|; }
 	}
+	$str .= "\t\t\t</ul>\n";
+	$str .= "\t\t</nav>\n";
 	return $str;
 }
 
 sub errorclear{
-	open(OUT,">$set{'error_log'}")||return 0;
+	open(OUT, ">$set{'error_log'}") || return 0;
 	eval{ flock(OUT, 2);}; eval{ truncate(OUT, 0);}; seek(OUT, 0, 0); eval{ flock(OUT, 8);}; close(OUT);
-	chmod($set{'per_upfile'},$set{'log_file'});
+	chmod($set{'per_upfile'}, $set{'log_file'});
 	return 1;
 }
 
 sub tablestr{
-	my ($value1,$value2) = @_;
-	return ("<tr><td>$value1</td><td>$value2</td></tr>\n");
+	my ($value1, $value2) = @_;
+	return <<"EOM";
+			<tr>
+				<td>$value1</td>
+				<td>$value2</td>
+			</tr>
+EOM
 }
 
 sub globfile{
-	my ($src_dir,$filename) = @_;
-	opendir(DIR,$src_dir)||return 0; my @dir = readdir(DIR); closedir(DIR);
-	my @new = (); foreach my $value (@dir){ push(@new,"$src_dir$value") if($value =~ /$filename/ && !(-d "$src_dir$value")); }
+	my ($src_dir, $filename) = @_;
+	opendir(DIR, $src_dir) || return 0; my @dir = readdir(DIR); closedir(DIR);
+	my @new = (); foreach my $value (@dir){ push(@new, "$src_dir$value") if($value =~ /$filename/ && !(-d "$src_dir$value")); }
 	return @new;
 }
 
 sub globdir{
-	my ($src_dir,$dir) = @_;
-	opendir(DIR,$src_dir)||return 0; my @dir = readdir(DIR); closedir(DIR);
-	my @new = (); foreach my $value (@dir){ if($value eq '.' ||$value eq '..' ){ next; } push(@new,"$src_dir$value") if($value =~ /$dir/ && (-d "$src_dir$value")); }
+	my ($src_dir, $dir) = @_;
+	opendir(DIR, $src_dir) || return 0; my @dir = readdir(DIR); closedir(DIR);
+	my @new = (); foreach my $value (@dir){ if($value eq '.' || $value eq '..' ){ next; } push(@new, "$src_dir$value") if($value =~ /$dir/ && (-d "$src_dir$value")); }
 	return @new;
 }
 
 sub error_disp{
-	my ($message,$mode) = @_;
-	my $url;
-	if($mode eq 'init'){ $url = qq|<a href="$set{'base_cgi'}">[ƒŠƒ[ƒh]</a>|; }else{ $url = qq|<a href="$set{'http_html_path'}$set{'base_html'}">[–ß‚é]</a>|; }
-	my $buff =<<"EOM";
-$set{'html_head'}$set{'html_css'}</HEAD>
-<body bgcolor="#ffffff" text="#000000" LINK="#6060FF" VLINK="#6060FF" ALINK="#6060FF">
+	my ($message, $mode) = @_;
+	$mode = '' if(!defined($mode));
+	my $url = ($mode eq 'init') ? qq|<a href="$set{'base_cgi'}">[ãƒªãƒ­ãƒ¼ãƒ‰]</a>| : qq|<a href="$set{'http_html_path'}$set{'base_html'}">[æˆ»ã‚‹]</a>|;
+	my $buff = <<"EOM";
+$set{'html_head'}</head>
+<body>
 <div align="center">
-<table summary="error">
+<table>
 $message
 <tr><td></td></tr>
 <tr><td><div align="center">$url</div></td></tr>
 </table>
 <br><br>
-<table summary="info">
+<table>
 <tr>
 <td>DATE</td><td>$in{'date'}</td></tr>
 <tr><td>ADDR</td><td>$in{'addr'}</td></tr>
@@ -844,84 +1184,93 @@ EOM
 }
 
 sub error{
-	my ($no,$note) = @_;
-	if (length($note) > 64) { $note = substr($note,0,64).'...'; }
-	$note =~ s/&/&amp;/g; $note =~ s/\"/&quot;/g; $note =~ s/</&lt;/g; $note =~ s/>/&gt;/g; $note =~ s/\r//g; $note =~ s/\n//g; $note =~ s/\t//g; $note =~ s/\0//g;
-	my ($message,$dispmsg,$flag);
+	my ($no, $note) = @_;
+	if(!defined($note)){ $note = ''; }
+	if (length($note) > 64){ $note = substr($note, 0, 64).'...'; }
+	$note =~ s/&/&amp;/g;
+	$note =~ s/\"/&quot;/g;
+	$note =~ s/</&lt;/g;
+	$note =~ s/>/&gt;/g;
+	$note =~ s/\r//g;
+	$note =~ s/\n//g;
+	$note =~ s/\t//g;
+	$note =~ s/\0//g;
+	my ($message, $dispmsg, $flag);
+
 	if($no == 98){ $message = ""; }
-	elsif($no == 99){ $message = "UpFile‚È‚µ"; }
-	elsif($no == 101){ $message = "“Še‹Ö~HOST"; }
-	elsif($no == 106){ $flag = 1; $message = "POSTƒTƒCƒY’´‰ß"; $note = dispsize($note); $dispmsg= '<tr><td>ƒtƒ@ƒCƒ‹‚ğƒAƒbƒvƒ[ƒh‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>ƒAƒbƒvƒ[ƒhƒtƒ@ƒCƒ‹('.$note.')‚Í Å‘å—e—Êİ’è('.dispsize($set{'max_size'}*1024).')‚ğ‰z‚¦‚Ä‚¢‚Ü‚·</td></tr>';}
-	elsif($no == 107){ $flag = 1; $message = "POSTƒTƒCƒY‰ß¬"; $note = dispsize($note); $dispmsg= '<tr><td>ƒtƒ@ƒCƒ‹‚ğƒAƒbƒvƒ[ƒh‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>ƒAƒbƒvƒ[ƒhƒtƒ@ƒCƒ‹('.$note.')‚Í Å¬—e—Êİ’è('.dispsize($set{'min_size'}*1024).')–¢–‚Å‚·</td></tr>';}
-#	elsif($no == 108){ $flag = 1; $message = "POSTƒf[ƒ^•sŠ®‘S"; $dispmsg = '<tr><td>ƒtƒ@ƒCƒ‹‚ğƒAƒbƒvƒ[ƒh‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>POSTƒf[ƒ^‚ª•sŠ®‘S‚Å‚·</td></tr>';}
-	elsif($no == 109){ $flag = 1; $message = "POSTKey•sˆê’v"; $dispmsg = '<tr><td>ƒtƒ@ƒCƒ‹‚ğƒAƒbƒvƒ[ƒh‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>POSTKey‚ªˆê’v‚µ‚Ü‚¹‚ñ</td></tr>';}
-	elsif($no == 202){ $flag = 1; $message = "Šg’£q‡‚í‚¸"; $dispmsg = '<tr><td>ƒtƒ@ƒCƒ‹‚ğƒAƒbƒvƒ[ƒh‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>“Še‚Å‚«‚éŠg’£q‚Í'.$set{'up_ext'}.'‚Å‚·</td></tr>';}
-	elsif($no == 203){ $flag = 1; $message = "“Še‘‚·‚¬"; $dispmsg = '<tr><td>ƒtƒ@ƒCƒ‹‚ğƒAƒbƒvƒ[ƒh‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>“¯ˆêIPƒAƒhƒŒƒX‚©‚ç'.$set{'interval'}.'•bˆÈ“à‚ÉÄ“Še‚Å‚«‚Ü‚¹‚ñ</td></tr>';}
-	elsif($no == 204){ $flag = 1; $message = "ˆêƒtƒ@ƒCƒ‹‘‚«‚ß‚¸"; $dispmsg = '<tr><td>ƒtƒ@ƒCƒ‹‚ğƒAƒbƒvƒ[ƒh‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>ˆêƒtƒ@ƒCƒ‹‚Ìì¬‚É¸”s‚µ‚Ü‚µ‚½</td></tr>';}
-	elsif($no == 205){ $flag = 1; $message = "“¯ˆêƒtƒ@ƒCƒ‹‘¶İ"; $note =~ /([^\/]+)$/; my $filename = $1; $dispmsg = '<tr><td>ƒtƒ@ƒCƒ‹‚ğƒAƒbƒvƒ[ƒh‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>“¯ˆêƒtƒ@ƒCƒ‹‚ª '.$filename.' ‚É‘¶İ‚µ‚Ü‚·</td></tr>';}
-	elsif($no == 206){ $flag = 1; $message = "‹Ö~Šg’£q"; $dispmsg = '<tr><td>ƒtƒ@ƒCƒ‹‚ğƒAƒbƒvƒ[ƒh‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>Šg’£q '.$note.' ‚ÍƒAƒbƒvƒ[ƒh‚Å‚«‚Ü‚¹‚ñ</td></tr>';}
-	elsif($no == 303){ $flag = 1; $message = "ƒƒOƒtƒ@ƒCƒ‹‚É“Ç‚İ‚ß‚¸"; $dispmsg = '<tr><td>ƒƒCƒ“ƒƒO‚Ì“Ç‚İ‚İ‚É¸”s‚µ‚Ü‚µ‚½</td></tr>';}
-	elsif($no == 304){ $flag = 1; $message = "ƒƒOƒtƒ@ƒCƒ‹‚É‘‚«‚ß‚¸"; $dispmsg = '<tr><td>ƒƒCƒ“ƒƒO‚Ì‘‚«‚İ‚É¸”s‚µ‚Ü‚µ‚½</td></tr>';}
-	elsif($no == 306){ $message = "ƒtƒ@ƒCƒ‹ƒŠƒXƒgHTML‘‚«‚ß‚¸";}
-	elsif($no == 307){ $message = "ƒtƒ@ƒCƒ‹HTMLƒtƒ@ƒCƒ‹‘‚«‚ß‚¸";}
-	elsif($no == 401){ $flag = 1; $message = "íœNo.ŒŸo‚Å‚«‚¸"; $dispmsg = '<tr><td>ƒtƒ@ƒCƒ‹‚ğíœ‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>'.$note.' ‚©‚çíœNo.‚ğŒŸo‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>'.$set{'file_pre'}.'0774.zip‚Ìê‡ No.‚É‚Í 774 ‚ğ“ü—Í‚µ‚Ü‚·</td></tr>';}
-	elsif($no == 402){ $flag = 1; $note = sprintf("%04d",int($note)); $message = "íœNo.‘¶İ‚¹‚¸"; $dispmsg = '<tr><td>ƒtƒ@ƒCƒ‹‚ğíœ‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>'.$set{'file_pre'}.$note.'.*** ‚ÍƒƒCƒ“ƒƒO‚É‘¶İ‚µ‚Ü‚¹‚ñ</td></tr>';}
-	elsif($no == 403){ $flag = 1; $message = "íœƒAƒNƒZƒX‹‘”Û"; $dispmsg = '<tr><td>ƒtƒ@ƒCƒ‹‚ğíœ‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>ƒtƒ@ƒCƒ‹íœğŒ‚Í–‚½‚µ‚Ä‚¢‚Ü‚·‚ª '.$note.' ‚Ìƒtƒ@ƒCƒ‹‚Ìíœ‚ª‹‘”Û‚³‚ê‚Ü‚µ‚½</td></tr><tr><td>ƒAƒNƒZƒX‚ª‰ßè‚Èê‡“™‚ÍŠÔ‚ğ’u‚¢‚ÄÄ‘€ì‚·‚é‚Æíœ‚Å‚«‚é‚±‚Æ‚ª‚ ‚è‚Ü‚·</td></tr>';}
-	elsif($no == 404){ $flag = 1; $message = "íœKey•sˆê’v"; $dispmsg = '<tr><td>ƒtƒ@ƒCƒ‹‚ğíœ‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>'.$note.' íœKey‚ªˆê’v‚µ‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr>';}
+	elsif($no == 99){ $message = "UpFileãªã—"; }
+	elsif($no == 101){ $message = "æŠ•ç¨¿ç¦æ­¢HOST"; }
+	elsif($no == 106){ $flag = 1; $message = "POSTã‚µã‚¤ã‚ºè¶…é"; $note = &snup::dispsize($note); $dispmsg= '<tr><td>ãƒ•ã‚¡ã‚¤ãƒ«ã‚’ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ãƒ•ã‚¡ã‚¤ãƒ«('.$note.')ã¯ æœ€å¤§å®¹é‡è¨­å®š('.&snup::dispsize($set{'max_size'}*1024).')ã‚’è¶Šãˆã¦ã„ã¾ã™</td></tr>';}
+	elsif($no == 107){ $flag = 1; $message = "POSTã‚µã‚¤ã‚ºéå°"; $note = &snup::dispsize($note); $dispmsg= '<tr><td>ãƒ•ã‚¡ã‚¤ãƒ«ã‚’ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ãƒ•ã‚¡ã‚¤ãƒ«('.$note.')ã¯ æœ€å°å®¹é‡è¨­å®š('.&snup::dispsize($set{'min_size'}*1024).')æœªæº€ã§ã™</td></tr>';}
+#	elsif($no == 108){ $flag = 1; $message = "POSTãƒ‡ãƒ¼ã‚¿ä¸å®Œå…¨"; $dispmsg = '<tr><td>ãƒ•ã‚¡ã‚¤ãƒ«ã‚’ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>POSTãƒ‡ãƒ¼ã‚¿ãŒä¸å®Œå…¨ã§ã™</td></tr>';}
+	elsif($no == 109){ $flag = 1; $message = "POSTKeyä¸ä¸€è‡´"; $dispmsg = '<tr><td>ãƒ•ã‚¡ã‚¤ãƒ«ã‚’ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>POSTKeyãŒä¸€è‡´ã—ã¾ã›ã‚“</td></tr>';}
+	elsif($no == 202){ $flag = 1; $message = "æ‹¡å¼µå­åˆã‚ãš"; $dispmsg = '<tr><td>ãƒ•ã‚¡ã‚¤ãƒ«ã‚’ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>æŠ•ç¨¿ã§ãã‚‹æ‹¡å¼µå­ã¯'.$set{'up_ext'}.'ã§ã™</td></tr>';}
+	elsif($no == 203){ $flag = 1; $message = "æŠ•ç¨¿æ—©ã™ã"; $dispmsg = '<tr><td>ãƒ•ã‚¡ã‚¤ãƒ«ã‚’ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>åŒä¸€IPã‚¢ãƒ‰ãƒ¬ã‚¹ã‹ã‚‰'.$set{'interval'}.'ç§’ä»¥å†…ã«å†æŠ•ç¨¿ã§ãã¾ã›ã‚“</td></tr>';}
+	elsif($no == 204){ $flag = 1; $message = "ä¸€æ™‚ãƒ•ã‚¡ã‚¤ãƒ«æ›¸ãè¾¼ã‚ãš"; $dispmsg = '<tr><td>ãƒ•ã‚¡ã‚¤ãƒ«ã‚’ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>ä¸€æ™‚ãƒ•ã‚¡ã‚¤ãƒ«ã®ä½œæˆã«å¤±æ•—ã—ã¾ã—ãŸ</td></tr>';}
+	elsif($no == 205){ $flag = 1; $message = "åŒä¸€ãƒ•ã‚¡ã‚¤ãƒ«å­˜åœ¨"; $note =~ /([^\/]+)$/; my $filename = $1; $dispmsg = '<tr><td>ãƒ•ã‚¡ã‚¤ãƒ«ã‚’ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>åŒä¸€ãƒ•ã‚¡ã‚¤ãƒ«ãŒ '.$filename.' ã«å­˜åœ¨ã—ã¾ã™</td></tr>';}
+	elsif($no == 206){ $flag = 1; $message = "ç¦æ­¢æ‹¡å¼µå­"; $dispmsg = '<tr><td>ãƒ•ã‚¡ã‚¤ãƒ«ã‚’ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>æ‹¡å¼µå­ '.$note.' ã¯ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã§ãã¾ã›ã‚“</td></tr>';}
+	elsif($no == 303){ $flag = 1; $message = "ãƒ­ã‚°ãƒ•ã‚¡ã‚¤ãƒ«ã«èª­ã¿è¾¼ã‚ãš"; $dispmsg = '<tr><td>ãƒ¡ã‚¤ãƒ³ãƒ­ã‚°ã®èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ã¾ã—ãŸ</td></tr>';}
+	elsif($no == 304){ $flag = 1; $message = "ãƒ­ã‚°ãƒ•ã‚¡ã‚¤ãƒ«ã«æ›¸ãè¾¼ã‚ãš"; $dispmsg = '<tr><td>ãƒ¡ã‚¤ãƒ³ãƒ­ã‚°ã®æ›¸ãè¾¼ã¿ã«å¤±æ•—ã—ã¾ã—ãŸ</td></tr>';}
+	elsif($no == 306){ $message = "ãƒ•ã‚¡ã‚¤ãƒ«ãƒªã‚¹ãƒˆHTMLæ›¸ãè¾¼ã‚ãš";}
+	elsif($no == 307){ $message = "ãƒ•ã‚¡ã‚¤ãƒ«HTMLãƒ•ã‚¡ã‚¤ãƒ«æ›¸ãè¾¼ã‚ãš";}
+	elsif($no == 401){ $flag = 1; $message = "å‰Šé™¤No.æ¤œå‡ºã§ããš"; $dispmsg = '<tr><td>ãƒ•ã‚¡ã‚¤ãƒ«ã‚’å‰Šé™¤ã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>'.$note.' ã‹ã‚‰å‰Šé™¤No.ã‚’æ¤œå‡ºã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>'.$set{'file_pre'}.'0774.zipã®å ´åˆ No.ã«ã¯ 774 ã‚’å…¥åŠ›ã—ã¾ã™</td></tr>';}
+	elsif($no == 402){ $flag = 1; $note = sprintf("%04d",int($note)); $message = "å‰Šé™¤No.å­˜åœ¨ã›ãš"; $dispmsg = '<tr><td>ãƒ•ã‚¡ã‚¤ãƒ«ã‚’å‰Šé™¤ã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>'.$set{'file_pre'}.$note.'.*** ã¯ãƒ¡ã‚¤ãƒ³ãƒ­ã‚°ã«å­˜åœ¨ã—ã¾ã›ã‚“</td></tr>';}
+	elsif($no == 403){ $flag = 1; $message = "å‰Šé™¤ã‚¢ã‚¯ã‚»ã‚¹æ‹’å¦"; $dispmsg = '<tr><td>ãƒ•ã‚¡ã‚¤ãƒ«ã‚’å‰Šé™¤ã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>ãƒ•ã‚¡ã‚¤ãƒ«å‰Šé™¤æ¡ä»¶ã¯æº€ãŸã—ã¦ã„ã¾ã™ãŒ '.$note.' ã®ãƒ•ã‚¡ã‚¤ãƒ«ã®å‰Šé™¤ãŒæ‹’å¦ã•ã‚Œã¾ã—ãŸ</td></tr><tr><td>ã‚¢ã‚¯ã‚»ã‚¹ãŒéå‰°ãªå ´åˆç­‰ã¯æ™‚é–“ã‚’ç½®ã„ã¦å†æ“ä½œã™ã‚‹ã¨å‰Šé™¤ã§ãã‚‹ã“ã¨ãŒã‚ã‚Šã¾ã™</td></tr>';}
+	elsif($no == 404){ $flag = 1; $message = "å‰Šé™¤Keyä¸ä¸€è‡´"; $dispmsg = '<tr><td>ãƒ•ã‚¡ã‚¤ãƒ«ã‚’å‰Šé™¤ã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>'.$note.' å‰Šé™¤KeyãŒä¸€è‡´ã—ã¾ã›ã‚“ã§ã—ãŸ</td></tr>';}
 
-	elsif($no == 51){ $flag = 1; $message = "[DLMode] No.Œ©‚Â‚©‚ç‚¸";  $dispmsg = '<tr><td>[DLMode] ƒtƒ@ƒCƒ‹‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>'.$note.' ‚©‚çƒtƒ@ƒCƒ‹No.‚ğŒŸo‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr>'; }
-	elsif($no == 52){ $flag = 1; $message = "[DLMode] FileŒ©‚Â‚©‚ç‚¸";  $dispmsg = '<tr><td>[DLMode] ƒtƒ@ƒCƒ‹‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr><tr><td>'.$set{'file_pre'}.$note.'.*** ‚ÍƒƒCƒ“ƒƒO‚É‘¶İ‚µ‚Ü‚¹‚ñ</td></tr>'; }
-	elsif($no == 53){ $flag = 1; $message = "[DLMode] DLkey–¢İ’è";  $dispmsg = '<tr><td>[DLMode] orgDLkeyError</td></tr><tr><td>'.$note.' DLKey‚ª–¢İ’è‚Å‚·</td></tr>'; }
-	elsif($no == 54){ $flag = 1; $message = "[DLMode] DLkey•sˆê’v";  $dispmsg = '<tr><td>[DLMode] orgDLkeyError</td></tr><tr><td>'.$note.' DLKey‚ªˆê’v‚µ‚Ü‚¹‚ñ‚Å‚µ‚½</td></tr>'; }
-	elsif($no == 55){ $flag = 1; $message = "[DLMode] File Oepn Error";  $dispmsg = '<tr><td>[DLMode] Open Error</td></tr><tr><td>'.$note.' ƒtƒ@ƒCƒ‹‚Ì“Ç‚İ‚İ‚É¸”s‚µ‚Ü‚µ‚½</td></tr>'; }
-	elsif($no == 56){ $flag = 1; $message = "[DLMode] File Not Found";  $dispmsg = '<tr><td>[DLMode] Not Found</td></tr><tr><td>'.$note.' ƒtƒ@ƒCƒ‹‚ª‘¶İ‚µ‚Ü‚¹‚ñ</td></tr>'; }
+	elsif($no == 51){ $flag = 1; $message = "[DLMode] No.è¦‹ã¤ã‹ã‚‰ãš";  $dispmsg = '<tr><td>[DLMode] ãƒ•ã‚¡ã‚¤ãƒ«ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>'.$note.' ã‹ã‚‰ãƒ•ã‚¡ã‚¤ãƒ«No.ã‚’æ¤œå‡ºã§ãã¾ã›ã‚“ã§ã—ãŸ</td></tr>'; }
+	elsif($no == 52){ $flag = 1; $message = "[DLMode] Fileè¦‹ã¤ã‹ã‚‰ãš";  $dispmsg = '<tr><td>[DLMode] ãƒ•ã‚¡ã‚¤ãƒ«ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸ</td></tr><tr><td>'.$set{'file_pre'}.$note.'.*** ã¯ãƒ¡ã‚¤ãƒ³ãƒ­ã‚°ã«å­˜åœ¨ã—ã¾ã›ã‚“</td></tr>'; }
+	elsif($no == 53){ $flag = 1; $message = "[DLMode] DLkeyæœªè¨­å®š";  $dispmsg = '<tr><td>[DLMode] orgDLkeyError</td></tr><tr><td>'.$note.' DLKeyãŒæœªè¨­å®šã§ã™</td></tr>'; }
+	elsif($no == 54){ $flag = 1; $message = "[DLMode] DLkeyä¸ä¸€è‡´";  $dispmsg = '<tr><td>[DLMode] orgDLkeyError</td></tr><tr><td>'.$note.' DLKeyãŒä¸€è‡´ã—ã¾ã›ã‚“ã§ã—ãŸ</td></tr>'; }
+	elsif($no == 55){ $flag = 1; $message = "[DLMode] File Oepn Error";  $dispmsg = '<tr><td>[DLMode] Open Error</td></tr><tr><td>'.$note.' ãƒ•ã‚¡ã‚¤ãƒ«ã®èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ã¾ã—ãŸ</td></tr>'; }
+	elsif($no == 56){ $flag = 1; $message = "[DLMode] File Not Found";  $dispmsg = '<tr><td>[DLMode] Not Found</td></tr><tr><td>'.$note.' ãƒ•ã‚¡ã‚¤ãƒ«ãŒå­˜åœ¨ã—ã¾ã›ã‚“</td></tr>'; }
 
-	elsif($no == 61){ $flag = 1; $message = "DLkey–¢İ’è";  $dispmsg = '<tr><td>DLKey‚ª–¢İ’è‚Å‚·</td></tr>'; }
+	elsif($no == 61){ $flag = 1; $message = "DLkeyæœªè¨­å®š";  $dispmsg = '<tr><td>DLKeyãŒæœªè¨­å®šã§ã™</td></tr>'; }
 
 	if($note){$message .= ' ';}
-	eval { close($in{'upfile'}); };
-	unlink($in{'tmpfile'});
+	eval{ if(defined($in{'upfile'}) && -t $in{'upfile'}){ close($in{'upfile'}); }};
+	unlink($in{'tmpfile2'}) if(defined($in{'tmpfile2'}));
 	if($set{'error_level'} && $no > 100){
 		unless(-e $set{'error_log'}){
-			open(OUT,">$set{'error_log'}");
+			open(OUT, ">$set{'error_log'}");
 			close(OUT);
-			chmod($set{'per_logfile'},$set{'error_log'});
+			chmod($set{'per_logfile'}, $set{'error_log'});
 		}
 		if($set{'error_size'} && ((-s $set{'error_log'}) > $set{'error_size'} * 1024)){
 			my $err_bkup = "$set{'error_log'}.bak.cgi";
 			unlink($err_bkup);
-			rename($set{'error_log'},$err_bkup);
-			open(OUT,">$set{'error_log'}");
+			rename($set{'error_log'}, $err_bkup);
+			open(OUT, ">$set{'error_log'}");
 			close(OUT);
-			chmod($set{'per_logfile'},$set{'error_log'});
+			chmod($set{'per_logfile'}, $set{'error_log'});
 		}
-		open(OUT,">>$set{'error_log'}");
+		open(OUT, ">>$set{'error_log'}");
 		print OUT "$in{'date'}<>$no<>$message$note<>$in{'addr'}<>$in{'host'}<>1\n";
 		close(OUT);
 	}
-	&error_disp($dispmsg) if($flag && $set{'disp_error'});
-	&quit();
+	&snup::error_disp($dispmsg) if($flag && $set{'disp_error'});
+	&snup::quit();
 }
 
 sub dlfile{
 	my $msg;
-	my ($orgdlkey,$orgdlpath);
-	my ($dlext,$dlfilepre);
-	my ($dl_date,$dl_comment,$dl_size,$dl_mime,,$dl_orgname);
+	my ($orgdlkey, $orgdlpath);
+	my ($dlext, $dlfilepre);
+	my ($dl_date, $dl_comment, $dl_size, $dl_mime,, $dl_orgname);
 	my $dlno = 0;
 	my $findflag;
 
-	open(IN,$set{'log_file'})||&error(303);
+	open(IN, $set{'log_file'}) || &snup::error(303);
 	my @log = <IN>;
 	close(IN);
 	shift(@log);
 
 	if($in{'file'} =~ /(\d+)/){ $dlno = $1; }
-	if($dlno == 0) { &error(51,$in{'file'}); }
+	if($dlno == 0){ &snup::error(51, $in{'file'}); }
 
 	foreach my $value (@log){
-		my ($no,$ext,$date,$comment,$mime,$orgname,$addr,$host,$pass,$filepre,$note,$dummy) = split(/<>/,$value);
-			my @note = split(/,/,$note);
+		my ($no, $ext, $date, $comment, $mime, $orgname, $addr, $host, $pass, $filepre, $note, $dummy) = split(/<>/, $value);
+			my @note = split(/,/, $note);
 			if(int($dlno) == $no){
 				$dl_comment = $comment;
 				$dl_mime = $mime;
@@ -942,33 +1291,38 @@ sub dlfile{
 	}
 
 	my $dlfile = $dlfilepre.sprintf("%04d",int($dlno)).'.'.$dlext;
-	if(!(-e "$set{'src_dir'}${dlfile}_$orgdlpath/$dlfile")){ &error(56,"$dlfile----$set{'src_dir'}${dlfile}_$orgdlpath/$dlfile"); }
+	if(!(-e "$set{'src_dir'}${dlfile}_$orgdlpath/$dlfile")){ &snup::error(56, "$dlfile----$set{'src_dir'}${dlfile}_$orgdlpath/$dlfile"); }
 
 	if($in{'dlkey'}){
-		my $dlsalt = substr($orgdlkey,0,2);
-		my $dlkey = crypt($in{'dlkey'},$dlsalt);
+		my $dlsalt = substr($orgdlkey, 0, 2);
+		my $dlkey = crypt($in{'dlkey'}, $dlsalt);
 
-		if($findflag == 0){ &error(52,$dlfile); }
-		elsif(!$orgdlkey){ &error(53,$dlfile); }
-		elsif($orgdlkey ne $dlkey && $set{'admin_pass'} ne $in{'dlkey'}){ &error(54,$dlfile); }
+		if($findflag == 0){ &snup::error(52, $dlfile); }
+		elsif(!$orgdlkey){ &snup::error(53, $dlfile); }
+		elsif($orgdlkey ne $dlkey && $set{'admin_pass'} ne $in{'dlkey'}){ &snup::error(54, $dlfile); }
 		#print "Location: $set{'http_src_path'}${dlfile}_$orgdlpath/$dlfile\n\n";
-		my $buff =<<"EOM";
-$set{'html_head'}$set{'html_css'}
-<META HTTP-EQUIV="Refresh" CONTENT="1;URL=$set{'http_src_path'}${dlfile}_$orgdlpath/$dlfile">
-</HEAD>
-<body bgcolor="#ffffff" text="#000000" LINK="#6060FF" VLINK="#6060FF" ALINK="#6060FF">
-<div align="center">
-<br>
-<table summary="dlfrom">
-<tr><td>”ò‚Î‚È‚¢ê‡‚Í <a href="$set{'http_src_path'}${dlfile}_$orgdlpath/$dlfile">‚±‚¿‚ç</a> ‚©‚ç</td></tr>
-</table>
+		my $buff = <<"EOM";
+$set{'html_head'}	<script type="text/javascript"><!--
+		setTimeout(function(){ location.href = "$set{'http_src_path'}${dlfile}_$orgdlpath/$dlfile" }, 1000);
+	--></script>
+</head>
+<body>
+
+<div id="wrapper">
+
+<section id="content">
+	<p>é£›ã°ãªã„å ´åˆã¯ <a href="$set{'http_src_path'}${dlfile}_$orgdlpath/$dlfile">ã“ã¡ã‚‰</a> ã‹ã‚‰</p>
+</section><!-- /#content -->
+
 </div>
-</body></html>
+
+</body>
+</html>
 EOM
 		print "Content-type: text/html\n\n";
 		print $buff;
 	}else{
-		my $buff = cryptfiledl($dl_comment,$dlfile,$orgdlpath,$dl_date,$dl_mime,$dl_orgname,$dlno);
+		my $buff = &snup::cryptfiledl($dl_comment, $dlfile, $orgdlpath, $dl_date, $dl_mime, $dl_orgname, $dlno);
 		print "Content-type: text/html\n\n";
 		print $buff;
 	}
@@ -976,33 +1330,79 @@ EOM
 }
 
 sub cryptfiledl{
-		my($com,$file,$orgdlpath,$date,$mime,$orgname,$no) = @_;
-		my($d_com,$d_date,$d_size,$d_mime,$d_org);
+		my($com, $file, $orgdlpath, $date, $mime, $orgname, $no) = @_;
+		my($d_com, $d_date, $d_size, $d_mime, $d_org);
 
-		if($set{'disp_comment'}){ $d_com = "<tr><td>COMMENT</td><td>$com</td></td>"; } if($set{'disp_size'}){ $d_size = "<tr><td>SIZE</td><td>".dispsize(-s "$set{'src_dir'}${file}_$orgdlpath/$file")." (".(-s "$set{'src_dir'}${file}_$orgdlpath/$file")."bytes)"."</td></tr>"; } if($set{'disp_date'}){ $d_date= "<tr><td>DATE</td><td>$date</td></tr>"; }
-		if($set{'disp_mime'}){ $d_mime = "<tr><td>ORGMIME</td><td>$mime</td></tr>"; } if($set{'disp_orgname'}){ $d_org = "<tr><td>ORGNAME</td><td>$orgname</td></tr>"; }
+		$d_com  = $set{'disp_comment'} ? "<tr><td>COMMENT</td><td>$com</td></tr>" : '';
+		$d_size = $set{'disp_size'}    ? "<tr><td>SIZE</td><td>".&snup::dispsize(-s "$set{'src_dir'}${file}_$orgdlpath/$file")." (".(-s "$set{'src_dir'}${file}_$orgdlpath/$file")."bytes)"."</td></tr>" : '';
+		$d_date = $set{'disp_date'}    ? "<tr><td>DATE</td><td>$date</td></tr>" : '';
+		$d_mime = $set{'disp_mime'}    ? "<tr><td>ORGMIME</td><td>$mime</td></tr>" : '';
+		$d_org  = $set{'disp_orgname'} ? "<tr><td>ORGNAME</td><td>$orgname</td></tr>" : '';
 
-		my $buff =<<"EOM";
-$set{'html_head'}$set{'html_css'}</HEAD>
-<body bgcolor="#ffffff" text="#000000" LINK="#6060FF" VLINK="#6060FF" ALINK="#6060FF">
-<div align="center">
-<br>
-$file ‚É‚ÍDLKey‚ªİ’è‚³‚ê‚Ä‚¢‚Ü‚·
-<table summary="dlform">
-<tr><td></td></tr>
-<FORM METHOD=POST ACTION="$set{'base_cgi'}" name="DL">
-<tr><td>
-<input type=hidden name=file value=$no>
-<input type=hidden name=jcode value="Š¿š">
-<input type=hidden name=mode value=dl></td></tr>
-$d_com$d_date$d_size$d_mime$d_org
-<tr><td>DLKey:<input type=text size=8 name="dlkey"></td></tr>
-<tr><td><input type=submit value="DownLoad"></td></tr>
-</FORM>
-</table>
+		my $buff = <<"EOM";
+$set{'html_head'}</head>
+<body>
+
+<div id="wrapper">
+
+<section id="content">
+	<p>$file ã«ã¯DLKeyãŒè¨­å®šã•ã‚Œã¦ã„ã¾ã™</p>
+	<table>
+		$d_com
+		$d_date
+		$d_size
+		$d_mime
+		$d_org
+	</table>
+	<form method="post" action="$set{'base_cgi'}" name="DL">
+		<p>
+			DLKey:<input type="text" size="8" name="dlkey" />
+			<input type="hidden" name="file" value="$no" />
+			<input type="hidden" name="jcode" value="æ¼¢å­—" />
+			<input type="hidden" name="mode" value="dl" />
+			<input type="submit" value="DownLoad" />
+		</p>
+	</form>
+</section><!-- /#content -->
+
 </div>
-</body></html>
+
+</body>
+</html>
 EOM
 
 	return $buff;
 }
+
+sub send_notification{
+	unless($set{'mail_notify'}){ return; }
+	my $subject = encode('MIME-Header-ISO_2022_JP', decode('utf8', $_[0]));
+	my $body = encode('iso-2022-jp', decode('utf8', $_[1]));
+	my $header = <<"EOM";
+From: Sn Uploader <$set{'notify_from'}>
+To: $set{'notify_to'}
+Subject: [$set{'html_title'}] $subject
+Mime-Version: 1.0
+X-Mailer: Sn Uploader $set{'ver'}
+Content-Type: text/plain; charset="iso-2022-jp"
+Content-Transfer-Encoding: 7bit
+
+EOM
+
+if($set{'smtp_auth'}){
+	my $pop = Net::POP3->new($set{'pop_server'}, Port => $set{'pop_port'}) || return;
+	$pop->login($set{'pop_userid'}, $set{'pop_passwd'});
+}
+my $smtp = Net::SMTP->new($set{'mail_server'}, Port => $set{'mail_port'}) || return;
+$smtp->mail($set{'notify_from'});
+$smtp->to($set{'notify_to'});
+$smtp->data();
+$smtp->datasend($header);
+$smtp->datasend($body);
+$smtp->dataend();
+$smtp->quit;
+}
+
+}
+
+1;
