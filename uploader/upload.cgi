@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+use CGI;
 use vars qw(%set %in);
 use strict;
 $set{'log_file'} = './log.cgi';		#ログファイル名
@@ -58,13 +59,12 @@ $set{'per_logfile'} = 0666;		#ログファイルのパーミッション　suexec=0600,other=06
 $set{'link_target'} = '';		#target属性
 
 #------
-$set{'ver'} = '2005/10/10e';
+$set{'ver'} = '2005/10/10e CGI.pm';
 $set{'char_delname'} = 'D';
 
 $in{'time'} = time(); $in{'date'} = conv_date($in{'time'});
 $in{'addr'} = $ENV{'REMOTE_ADDR'};
 $in{'host'} = gethostbyaddr(pack('C4',split(/\./, $in{'addr'})), 2) || $ENV{'REMOTE_HOST'} || '(none)';
-
 if($in{'addr'} eq $in{'host'}){ $in{'host'} = '(none)'; }
 
 $set{'html_head'} =<<"EOM";
@@ -92,13 +92,13 @@ EOM
 
 unless(-e $set{'log_file'}){ &init; }
 unless(-e $set{'base_html'}){ &makehtml; }
+
 { #デコード
-	my $readbuffsize = 1024*8;
 	if ($ENV{'REQUEST_METHOD'} eq "POST" && $ENV{'CONTENT_TYPE'} =~ /multipart\/form-data/i){
-		if ($ENV{'CONTENT_LENGTH'} > ($set{'max_size'} * 1024 + 1024)){ if($ENV{'SERVER_SOFTWARE'} =~ /IIS/){ while(read(STDIN,my $buff,$readbuffsize)){} } &error(106,$ENV{'CONTENT_LENGTH'});}
-	}else{
-		if ($ENV{'CONTENT_LENGTH'} > 1024*100){ error(98); }
-	}
+		if ($ENV{'CONTENT_LENGTH'} > ($set{'max_size'} * 1024 + 1024)){ if($ENV{'SERVER_SOFTWARE'} =~ /IIS/){ while(read(STDIN,my $buff,8192)){} } &error(106,$ENV{'CONTENT_LENGTH'});}
+ 	}else{
+ 		if ($ENV{'CONTENT_LENGTH'} > 1024*100){ error(98); }
+ 	}
 	my %ck; foreach(split(/;/,$ENV{'HTTP_COOKIE'})){ my($key,$val) = split(/=/); $key =~ s/\s//g; $ck{$key} = $val;}
 	my @ck = split(/<>/,$ck{'SN_USER'});
 	if(length($ck[0]) < 5){ 
@@ -106,107 +106,19 @@ unless(-e $set{'base_html'}){ &makehtml; }
 		my $salt = $salt[int(rand(@salt))] . $salt[int(rand(@salt))];
 		$in{'user'} = crypt($in{'addr'}.$in{'time'}, $salt);
 	}else{ $in{'user'} = $ck[0]; }
-
-	if($ENV{'REQUEST_METHOD'} eq "POST" && $ENV{'CONTENT_TYPE'} =~ /multipart\/form-data/i){
-		my %FORM;	my $subbuff; my $filename;	my $valuename;
-		my $upflag;	my $valueflag; my $bound;	my $mime;
-		my $readlength = 0;
-		my $random = int(rand(900000)) + 100000;
-		my $endflag = 0;
-		binmode(STDIN);
-		while(<STDIN>){	$readlength += length($_); if(/(--.*)\r\n$/){ $bound = $1; last; }}
-		if(-e "$set{'src_dir'}$random.temporary"){ $random++; }
-		if(-e "$set{'src_dir'}$random.temporary"){ $random++; }
-		if(-e "$set{'src_dir'}$random.temporary"){ &error(204); }
-
-		open(OUT,">$set{'src_dir'}$random.temporary");
-		binmode(OUT);
-		my $formbuff;
-		while(my $buff = <STDIN>){
-			$readlength += length($buff);
-			if($upflag == 1){ if($buff =~ /Content-Type:\s(.*)\r\n$/i){ $mime = $1; } $upflag++; next;}
-			if($upflag == 2){
-				while(1){
-					my $readblen; my $filebuff;
-					if($ENV{'CONTENT_LENGTH'} - $readlength < $readbuffsize){ $readblen = $ENV{'CONTENT_LENGTH'} - $readlength; }
-					else{ $readblen = $readbuffsize; }
-					if(!read(STDIN,$filebuff,$readblen)){ last };
-					$readlength += length($filebuff);
-					if($ENV{'CONTENT_LENGTH'} - $readlength < $readbuffsize){
-						my $readblen = $ENV{'CONTENT_LENGTH'} - $readlength;
-						read(STDIN,my $subbuff,$readblen);
-						$readlength += length($subbuff);
-						$filebuff .= $subbuff;
-						$endflag = 1;
-					}
-					my $offset = index($filebuff,$bound);
-					if($offset >= 0){
-						$buff = substr($filebuff,0,$offset-2); my $subbuff = substr($filebuff,$offset);
-						print OUT $buff; $upflag = 0; $formbuff .= $subbuff; last;
-					}else{ print OUT $filebuff;	}
-				}
-				if($endflag){ last; }
-				next;
-			}
-			if($buff =~ /^Content-Disposition:\sform-data;\sname=\"upfile\";\sfilename=\"(.*)\"\r\n$/i){
-				$filename = $1;	$upflag = 1; next;
-			}
-			$formbuff .= $buff;
-		}
-		close(OUT);
-		chmod($set{'per_upfile'},"$set{'src_dir'}$random.temporary");
-		{ my $value;
-			foreach my $buff(split(/\r\n/,$formbuff)){
-				$buff .= "\r\n";
-				if($buff =~ /^$bound\-\-/){ $FORM{$value} =~ s/\r\n$//; $valueflag = 0; last;}
-				if($buff =~ /^$bound/){ $FORM{$value} =~ s/\r\n$//; $valueflag = 0; next;}
-				if($valueflag == 1){ $valueflag++; next; }
-				if($valueflag == 2){ $FORM{$value} .= $buff; }
-				if($buff =~ /^Content-Disposition: form-data; name=\"(.+)\"\r\n$/){ $value = $1; $valueflag++; }
-			}
-		}
-		if($upflag || $valueflag){ unlink("$set{'src_dir'}$random.temporary"); &error(108);}
-
-		$in{'org_pass'} = $in{'pass'} = $FORM{'pass'};
-		$in{'dlkey'} = $FORM{'dlkey'};
-		$in{'comment'} = $FORM{'comment'};
-		$in{'jcode'} = $FORM{'jcode'};
-		$in{'postkey'} = $FORM{'postkey'};
-		$in{'upfile'} = $filename;
-		$in{'type'} = $mime;
-		$in{'tmpfile'} = "$set{'src_dir'}$random.temporary";
-		$in{'orgname'} = $in{'upfile'};
-		if(-s "$in{'tmpfile'}" == 0){ unlink("$in{'tmpfile'}"); &error(99) }
-		if($set{'min_flag'} && ((-s "$in{'tmpfile'}") < $set{'min_size'} * 1024)){ &error(107,(-s "$in{'tmpfile'}"));}
-		if((-s "$in{'tmpfile'}") > $set{'max_size'} * 1024){ &error(106,(-s "$in{'tmpfile'}"));}
-		if($set{'post_flag'} && !check_postkey($in{'postkey'})){ &error(109); }
-		if($set{'dlkey'} == 2 && !$in{'dlkey'}){ unlink("$in{'tmpfile'}"); &error(61); }
-	}else{
-		my ($buffer,%FORM,@admin_delno);
-		if ($ENV{'REQUEST_METHOD'} eq "POST") { read(STDIN, $buffer, $ENV{'CONTENT_LENGTH'});}
-		else { $buffer = $ENV{'QUERY_STRING'}; }
-		my @pairs = split(/&/,$buffer);
-		foreach my $pair (@pairs) {
-			my ($name, $value) = split(/=/, $pair);
-			$value =~ tr/+/ /;
-			$value =~ s/%([a-fA-F0-9][a-fA-F0-9])/pack("C", hex($1))/eg;
-			if($name eq 'admin_delno'){
-				push(@admin_delno,$value);
-			}else{
-				$FORM{$name} = $value;
-			}
-		}
-		$in{'delpass'} = $FORM{'delpass'};
-		$in{'delno'} = $FORM{'delno'};
-		$in{'file'} = $FORM{'file'};
-		$in{'dlkey'} = $FORM{'dlkey'};
-		$in{'mode'} = $FORM{'mode'};
-		$in{'checkmode'} = $FORM{'checkmode'};
-		$in{'admin_delno'} = join(',',@admin_delno);
-		if($in{'delno'} eq $set{'admin_name'} && $in{'delpass'} eq $set{'admin_pass'}){ &admin_mode(); }
-		if(!$in{'delno'} && $in{'delpass'} eq $set{'admin_pass'}){ &makehtml; &quit; }
-	}
-
+	
+	my $q = new CGI;
+	$in{'upfile'} = $q->param('upfile');
+	$in{'tmpfile'} = $q->tmpFileName($in{'upfile'});
+	$in{'type'} = $q->uploadInfo($in{'upfile'})->{'Content-Type'} if ($in{'upfile'});
+	$in{'pass'} = $q->param('pass');	$in{'mode'} = $q->param('mode');	
+	$in{'delno'} = $q->param('delno');	$in{'comment'} = $q->param('comment');
+	$in{'jcode'} = $q->param('jcode');	$in{'delpass'} = $q->param('delpass');
+	$in{'orgname'} = $in{'upfile'};	$in{'postkey'} = $q->param('postkey');
+	$in{'org_pass'} = $in{'pass'};
+	$in{'checkmode'} = $q->param('checkmode');
+	$in{'file'} = $q->param('file');	$in{'dlkey'} = $q->param('dlkey');
+	$in{'admin_delno'} = join(',',$q->param('admin_delno'));
 	my @denyhost = split(/,/,$set{'deny_host'});
 	foreach my $value (@denyhost){
 		if ($in{'addr'} =~ /$value/ || $in{'host'} =~ /$value/){ &error(101);}
@@ -225,22 +137,25 @@ unless(-e $set{'base_html'}){ &makehtml; }
 		$value =~ s/\0//g;
 	}
 	($in{'comment'},$in{'orgname'},$in{'type'},$in{'dlkey'}) = @form;
+	 $in{'tmpfile2'} = &filewrite() if ($in{'upfile'});
 }
 
-
-if($in{'mode'} eq 'delete'){ &delete(); &quit(); }
+if($in{'delno'} eq $set{'admin_name'} && $in{'delpass'} eq $set{'admin_pass'}){ &admin_mode(); }
+if(!$in{'delno'} && $in{'delpass'} eq $set{'admin_pass'}){ &makehtml(); &quit(); }
 if($in{'mode'} eq 'dl'){ &dlfile;} #DL
-if(!$in{'upfile'}){ &error(99); }
+if($in{'mode'} eq 'delete'){ &delete(); &quit(); }
 
 {#メイン処理
-
+	if(!$in{'upfile'}){ &error(99); }
+	if($set{'post_flag'} && !check_postkey($in{'postkey'})){ error(109); }
+	if($set{'dlkey'} == 2 && !$in{'dlkey'}){ unlink("$in{'tmpfile2'}"); &error(61); }
 	open(IN,$set{'log_file'})||&error(303);
 	my @log = <IN>;
 	close(IN);
 	my ($no,$lastip,$lasttime) = split(/<>/,$log[0]);
 
-	if($set{'interval'} && $in{'time'} <= ($lasttime + $set{'interval'}) && $in{'addr'} eq $lastip){ &error(203);}
-	$in{'ext'} = extfind($in{'orgname'}); if(!$in{'ext'}){ &error(202); }
+	if($set{'interval'} && $set{'interval'} && $in{'time'} <= ($lasttime + $set{'interval'}) && $in{'addr'} eq $lastip){ &error(203);}
+	$in{'ext'} = extfind($in{'orgname'}); if(!$in{'ext'} && $in{'upfile'}){ &error(202); }
 
 	my $orgname;
 	if(split(/\//,$in{'orgname'}) > split(/\\/,$in{'orgname'})){	my @name = split(/\//,$in{'orgname'}); $orgname = $name[$#name]; }
@@ -257,7 +172,7 @@ if(!$in{'upfile'}){ &error(99); }
 		foreach my $dir (@dir){	push(@files,globfile($dir."/",".*")); }
 		foreach my $value (@files){
 			next if($value =~ /\.temporary$/);
-			if(binarycmp($in{'tmpfile'},$value)){ unlink($in{'tmpfile'}); &error(205,$value);}
+			if(binarycmp($in{'tmpfile2'},$value)){ unlink($in{'tmpfile2'}); &error(205,$value);}
 		}
 	}
 
@@ -278,21 +193,21 @@ if(!$in{'upfile'}){ &error(99); }
 
 	my $dlsalt;
 	my $filedir;
-	my $allsize = (-s $in{'tmpfile'});
-	
+	my $allsize = (-s $in{'tmpfile2'});
+
 	if($set{'dlkey'} && $in{'dlkey'}){
 		my @salt = ('a'..'z', 'A'..'Z', '0'..'9'); srand;
 		for (my $c = 1; $c <= 20; ++$c) { $dlsalt .= $salt[int(rand(@salt))]; }
 	 	$filedir = "$set{'src_dir'}$set{'file_pre'}${tmpno}.$in{'ext'}_$dlsalt/";
 		mkdir($filedir,$set{'per_dir'});
-		rename("$in{'tmpfile'}","$filedir$set{'file_pre'}$tmpno.$in{'ext'}");
+		rename("$in{'tmpfile2'}","$filedir$set{'file_pre'}$tmpno.$in{'ext'}");
 		open(OUT,">${filedir}index.html");
 		close(OUT);
 		chmod($set{'per_upfile'},"${filedir}index.html");
 		$in{'comment'} = '<font color="#FF0000">[DLKey] </font>'.$in{'comment'};
 	}else{
 		undef $in{'dlkey'};
-		rename("$in{'tmpfile'}","$set{'src_dir'}$set{'file_pre'}$tmpno.$in{'ext'}");
+		rename("$in{'tmpfile2'}","$set{'src_dir'}$set{'file_pre'}$tmpno.$in{'ext'}");
 	}
 
 	if (length($orgname) > 128) { $orgname = substr($orgname,0,128).'...'; }
@@ -494,6 +409,24 @@ COMMENT<br>
 	}
 }
 
+sub filewrite{
+	my $random = int(rand(900000)) + 100000;
+	if(-e "$set{'src_dir'}$random.temporary"){ $random++; }
+	if(-e "$set{'src_dir'}$random.temporary"){ &error(204); }
+	open (FILE,">$set{'src_dir'}$random.temporary") || &error(204);
+	binmode(FILE);
+	eval{ while(my $read = read($in{'upfile'}, my $buff, 8192)){ print FILE $buff; }};
+	close(FILE);
+	chmod($set{'per_upfile'},"$set{'src_dir'}$random.temporary");
+	if((-s "$set{'src_dir'}$random.temporary") == 0){ unlink("$set{'src_dir'}$random.temporary"); &error(99); }
+	my $size = (-s "$set{'src_dir'}$random.temporary");
+	if($set{'min_flag'} && ($size < $set{'min_size'} * 1024)){ unlink("$set{'src_dir'}$random.temporary"); &error(107,$size);}
+	if($size > $set{'max_size'} * 1024){ unlink("$set{'src_dir'}$random.temporary"); &error(106,$size);}
+	eval { close($in{'upfile'});};
+	unlink($in{'tmpfile'});
+	return("$set{'src_dir'}$random.temporary");
+}
+
 sub delete{
 	my $mode = $_[0];
 	my @delno = split(/,/,$_[1]);
@@ -562,7 +495,6 @@ sub delete{
 		&makehtml();
 	}
 }
-
 
 sub quit{
 	my ($cookiename,$buff);
@@ -702,7 +634,6 @@ sub extfind{
 	return 0;
 }
 
-
 sub conv_date{
 	my @date = gmtime($_[0] + 9*60*60);
 	$date[5] -= 100; $date[4]++;
@@ -777,7 +708,6 @@ sub makedummyhtml{
 	chmod($set{'per_upfile'},"$set{'src_dir'}$filename.html");
 	return 1;
 }
-
 
 sub logwrite{
 	my @log = @_;
@@ -918,13 +848,12 @@ sub error{
 	if (length($note) > 64) { $note = substr($note,0,64).'...'; }
 	$note =~ s/&/&amp;/g; $note =~ s/\"/&quot;/g; $note =~ s/</&lt;/g; $note =~ s/>/&gt;/g; $note =~ s/\r//g; $note =~ s/\n//g; $note =~ s/\t//g; $note =~ s/\0//g;
 	my ($message,$dispmsg,$flag);
-	
 	if($no == 98){ $message = ""; }
 	elsif($no == 99){ $message = "UpFileなし"; }
 	elsif($no == 101){ $message = "投稿禁止HOST"; }
 	elsif($no == 106){ $flag = 1; $message = "POSTサイズ超過"; $note = dispsize($note); $dispmsg= '<tr><td>ファイルをアップロードできませんでした</td></tr><tr><td>アップロードファイル('.$note.')は 最大容量設定('.dispsize($set{'max_size'}*1024).')を越えています</td></tr>';}
 	elsif($no == 107){ $flag = 1; $message = "POSTサイズ過小"; $note = dispsize($note); $dispmsg= '<tr><td>ファイルをアップロードできませんでした</td></tr><tr><td>アップロードファイル('.$note.')は 最小容量設定('.dispsize($set{'min_size'}*1024).')未満です</td></tr>';}
-	elsif($no == 108){ $flag = 1; $message = "POSTデータ不完全"; $dispmsg = '<tr><td>ファイルをアップロードできませんでした</td></tr><tr><td>POSTデータが不完全です</td></tr>';}
+#	elsif($no == 108){ $flag = 1; $message = "POSTデータ不完全"; $dispmsg = '<tr><td>ファイルをアップロードできませんでした</td></tr><tr><td>POSTデータが不完全です</td></tr>';}
 	elsif($no == 109){ $flag = 1; $message = "POSTKey不一致"; $dispmsg = '<tr><td>ファイルをアップロードできませんでした</td></tr><tr><td>POSTKeyが一致しません</td></tr>';}
 	elsif($no == 202){ $flag = 1; $message = "拡張子合わず"; $dispmsg = '<tr><td>ファイルをアップロードできませんでした</td></tr><tr><td>投稿できる拡張子は'.$set{'up_ext'}.'です</td></tr>';}
 	elsif($no == 203){ $flag = 1; $message = "投稿早すぎ"; $dispmsg = '<tr><td>ファイルをアップロードできませんでした</td></tr><tr><td>同一IPアドレスから'.$set{'interval'}.'秒以内に再投稿できません</td></tr>';}
@@ -949,8 +878,9 @@ sub error{
 
 	elsif($no == 61){ $flag = 1; $message = "DLkey未設定";  $dispmsg = '<tr><td>DLKeyが未設定です</td></tr>'; }
 
-	unlink($in{'tmpfile'});
 	if($note){$message .= ' ';}
+	eval { close($in{'upfile'}); };
+	unlink($in{'tmpfile'});
 	if($set{'error_level'} && $no > 100){
 		unless(-e $set{'error_log'}){
 			open(OUT,">$set{'error_log'}");
