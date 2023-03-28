@@ -1,71 +1,82 @@
-# Sn Uploader ��
+# Sn Uploader 改
 
-Sn Uploader (CGI.pm��) �ɃT���l�C�������@�\�ƃ��[���ʒm�@�\�𖳗���t���������A�b�v���[�_�X�N���v�g�ł��B
+Sn Uploader (CGI.pm版) \[[archive](https://web.archive.org/web/20140331084142/http://sugachan.dip.jp/obsolete/snup/)\] にサムネイル生成機能とメール通知機能を無理矢理付け足したアップローダスクリプトです。
 
-## �ǉ��@�\
+[動作例](https://v2c.mgmn.jp/up/)
 
-* ImageMagick�ɂ��T���l�C���摜�쐬
-* �t�@�C���̃A�b�v���[�h���ƍ폜���Ɏw��A�h���X�փ��[���ʒm���M
+## 追加機能
 
-## �ݒu�̑O��
+- ImageMagickによるサムネイル画像作成
+- ファイルのアップロード時と削除時に指定アドレスへメール通知送信
 
-�A�b�v���[�_�̐ݒu�ɂ̓��X�N���Ƃ��Ȃ��܂��B
+## 設置の前に
 
-* 2007-02-24 �Ђǂ��ڂɂ�����(�ʕ��Ҕ���)
-* 2007-02-27 �����ĂȂ�Ĕn���n���n���n��(�ʕ��Ҕ���)
-* ���u�T�[�o�[�Ƀ��o�������u����ĉƑ�{��(�X���h)
+アップローダの設置にはリスクがともないます。
 
-���̃X�N���v�g�̓��[���ʒm������Ă��܂����A��ɐ��������삷�邩�̕ۏ؂͂ł��܂���B �ݒu����ꍇ�͐ݒu�ꏊ�̖@�ɑ������Ǘ������Ă��������B
+- [2007-02-24 ひどい目にあった(駄文待避所)](https://onigiri.hatenadiary.org/entries/2007/02/24)
+- [2007-02-27 俺ってなんて馬鹿馬鹿馬鹿馬鹿(駄文待避所)](https://onigiri.hatenadiary.org/entries/2007/02/27)
+- [放置サーバーにヤバい物が置かれて家宅捜索(スラド)](https://srad.jp/story/07/03/04/0245212)
 
-## �����
+このスクリプトはメール通知を備えていますが、常に正しく動作するかの保証はできません。 設置する場合は設置場所の法に則った管理をしてください。
 
-Sn Uploader ���̓���ɂ͈ȉ��̃��W���[�����K�v�ɂȂ�܂��B
+## 動作環境
 
-* Encode
-* Net::SMTP
-* Net::POP3
-* ImageMagick (PerlMagick)
+Sn Uploader 改の動作には以下のモジュールが必要になります。
 
-Windows + Perl 5.8 (32bit/64bit) �� CentOS + Perl 5.10 (64bit) �œ���m�F���Ă��܂��B mod_perl �ł�������������܂���B
+- Encode
+- Net::SMTP
+- Net::POP3
+- ImageMagick (PerlMagick)
 
-## �ݒu���@
+Windows + Perl 5.8 (32bit/64bit) と CentOS + Perl 5.10 (64bit) で動作確認しています。 mod_perl でも動くかもしれません。
 
-zip���𓀂��Aupload.pl ���̐ݒ�ϐ����e�L�X�g�G�f�B�^�ŕҏW���܂��B �e�ݒ�ϐ��̐����͓�����readme��X�N���v�g���Q�Ƃ��Ă��������B
-�ݒu����f�B���N�g�����쐬���A���̉���zip���̃t�@�C�����A�b�v���[�h���Ă��������B doc �f�B���N�g���͍폜���č\���܂���B
+## 設置方法
 
-### �\����
-    -- uploader / upload.pl  --- �X�N���v�g�{��
-        |   index.html --- (��������)
-        |
-        +-- src   --- �A�b�v���[�h�t�@�C���ۑ��f�B���N�g��
-        +-- thumb --- �T���l�C���ۑ��f�B���N�g��
-        +-- log   --- ���O�f�B���N�g��
-        +-- img   --- CSS�f�B���N�g��
+zipを解凍し、upload.pl 内の設定変数をテキストエディタで編集します。 各設定変数の説明は同梱のreadmeやスクリプトを参照してください。
+設置するディレクトリを作成し、その下にzip内のファイルをアップロードしてください。 doc ディレクトリは削除して構いません。
 
-### chmod ��
-    chmod 777 uploader uploader/src uploader/thumb uploader/log uploader/img
-    chmod 755 uploader/upload.pl
-    chmod 666 uploader/index.html
+### 構成例
 
-�ݒu��Auploader/upload.pl �Ƀu���E�U����A�N�Z�X����� index.html ��������������܂��B
+```text
+-- uploader / upload.pl  --- スクリプト本体
+    |   index.html --- (自動生成)
+    |
+    +-- src   --- アップロードファイル保存ディレクトリ
+    +-- thumb --- サムネイル保存ディレクトリ
+    +-- log   --- ログディレクトリ
+    +-- img   --- CSSディレクトリ
+```
 
-## �T�|�[�g
+### chmod 例
 
-���̃X�N���v�g�Ɋւ���o�O�񍐓��� �{��Sn Uploader�̃T�C�g�ł͂Ȃ��A���T�C�g�܂� ���肢���܂� (�A����̓g�b�v�y�[�W�Ɍf�ڂ��Ă��܂�)�B
+```bash
+chmod 777 uploader uploader/src uploader/thumb uploader/log uploader/img
+chmod 755 uploader/upload.pl
+chmod 666 uploader/index.html
+```
 
-�ۏ؂͂���܂��񂪁A�o�������͈̔͂őΉ�����Ǝv���܂��B
+設置後、uploader/upload.pl にブラウザからアクセスすると index.html が自動生成されます。
 
-## ���C�Z���X
+## サポート
 
-�{�� Sn Uploader �̍Ĕz�z�K��ɏ����܂��B ���T�C�g�̃����N�\���͍폜�ł��B
-Changelog
+このスクリプトに関するバグ報告等は 本家Sn Uploaderのサイトではなく、[mgmn](https://github.com/mgmn) までお願いします。
+
+保証はありませんが、出来る限りの範囲で対応すると思います。
+
+## ライセンス
+
+[本家 Sn Uploader の再配布規定](https://github.com/mgmn/snupmod/blob/uploader-kai/sn_saihaifu.txt) に準じます。 当サイトのリンク表示は削除可です。
+
+## Changelog
 
 ### mod.1603072206
-* ���[���ʒm�@�\���������܂����B
-* DLKey��L���ɂ��Ă����DLKey���ݒ肳��Ă��Ȃ��t�@�C���ł��T���l�C�����쐬����Ȃ��s����C�����܂����B
-* [ALL]��L���ɂ��Ă���Ƒ��̃t�@�C�����X�g���d�����ďo�͂����s����C�����܂����B
-* DLKey�܂���dummyHTML�̂���t�@�C���ŃT���l�C���̃����N�悪404�ɂȂ�s����C�����܂����B
-* DLKey�t���̃t�@�C���A�b�v���[�h���� Use of uninitialized value �x�����o��s����C�����܂����B
+
+- メール通知機能を実装しました。
+- DLKeyを有効にしているとDLKeyが設定されていないファイルでもサムネイルが作成されない不具合を修正しました。
+- \[ALL\]を有効にしていると他のファイルリストが重複して出力される不具合を修正しました。
+- DLKeyまたはdummyHTMLのあるファイルでサムネイルのリンク先が404になる不具合を修正しました。
+- DLKey付きのファイルアップロード時に Use of uninitialized value 警告が出る不具合を修正しました。
 
 ### mod.1403110536
-* �Ƃ肠�����������B
+
+- とりあえず動いた。
